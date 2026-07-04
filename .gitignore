@@ -1,0 +1,15 @@
+# Keil
+Objects/
+Listings/
+DebugConfig/
+
+# Temporary files
+*.bak
+*.dep
+*.crf
+
+# User settings
+*.uvoptx
+
+# VS Code (если когда-нибудь откроешь)
+.vscode/
