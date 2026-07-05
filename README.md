@@ -53,8 +53,6 @@ Main system components:
 
 - STM32F103 microcontroller
 - SI5351 clock generator
-- ADC + DMA data acquisition
-- PWM output stage
 - TFT display (ILI9341)
 - Encoder and button interface
 
