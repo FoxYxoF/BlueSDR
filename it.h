@@ -16,7 +16,7 @@ void SysTick_Handler(void);	// Прерывание от системного таймера (счетчика миллис
 void HardFault_Handler(void);	// Прерывание от критической ошибки
 void DMA1_Channel1_IRQHandler(void);  // Прерывания DMA1
 void Fill_buff(void);           // Заполнение буфферных массивов
-void hilbert_q_only_q15(q15_t *pSrc, q15_t *pDstQ, uint32_t blockSize); // преобразование Гильберта
+//void hilbert_q_only_q15(q15_t *pSrc, q15_t *pDstQ, uint32_t blockSize); // преобразование Гильберта
 uint8_t Get_Buttons_Code(void); // Так как пины разбросаны, их нужно собрать в одну тетраду (0..15) программно
 void Start_Debounce(void); // Таймер антидребезга кнопок
 void Button_Process(uint8_t code); // Обработчик нажатия кнопок

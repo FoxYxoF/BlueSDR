@@ -406,7 +406,10 @@ void DMA1_Channel1_IRQHandler(void) {
 	}
 
 }
-// ФВЧ БИХ 3 порядка (18 dB/окт) 
+//DC Blocker
+//IIR 
+//3-stage
+// Блокировка постоянной. ФВЧ БИХ 3 порядка (18 dB/окт) 
 static __inline void Process_Audio_HPF(q31_t *sample) {
     // Читаем 32-битное значение из памяти в регистр процессора
     int32_t audio_buf = *sample;
@@ -560,6 +563,7 @@ void EXTI15_10_IRQHandler(void) { EXTI->PR = EXTI_PR_PR15; Start_Debounce(); }
  * @param pEnv      - указатель на переменную огибающей (static)
  * @param pGain     - указатель на переменную усиления (static)
  */
+// не забыть сделать инлайн
 int16_t process_dynamic_gain(int32_t sample_in, const AGC_Config *cfg, int32_t *pEnv, int32_t *pGain) {
     int32_t abs_s = abs(sample_in);
 

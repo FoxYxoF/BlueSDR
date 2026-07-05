@@ -244,8 +244,8 @@ void PWM3_Init(void) { // Инициализация шим
     RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
 
     // 3. Настройка таймера TIM2
-    TIM3->PSC = 1 - 1;       // Прескалер: 72 МГц / 1 = 72 МГц 
-    TIM3->ARR = 1024 - 1;     // Период: 72M/1024
+    TIM3->PSC = 1 - 1;       // Прескалер: 112 МГц / 1 = 112 МГц 
+    TIM3->ARR = 1024 - 1;     // Период: 112M/1024 (109.4кгц)
 
 		// PWM mode 1 для CH4 + включение буфера (Preload)
 		TIM3->CCMR2 |= (TIM_CCMR2_OC4M_2 | TIM_CCMR2_OC4M_1 | TIM_CCMR2_OC4PE);
