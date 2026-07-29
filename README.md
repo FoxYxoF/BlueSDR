@@ -1,6 +1,6 @@
 # BlueSDR
 
-**STM32F103C8T6 Software Defined Radio (SDR) Transceiver — v0.1 prototype**
+**STM32F103C8T6 Software Defined Radio (SDR) Transceiver — v0.2**
 
 Hybrid SDR system with real-time DSP processing, analog RF frontend, and TFT spectrum display.
 
@@ -8,11 +8,9 @@ Hybrid SDR system with real-time DSP processing, analog RF frontend, and TFT spe
 
 ## 📡 Overview
 
-BlueSDR is an experimental software-defined radio transceiver based on STM32F103 (Blue Pill).
+BlueSDR is an experimental software-defined radio transceiver based on STM32F103 (Blue Pill) and SI5351 clock generator.
 
 The system combines real-time digital signal processing with an analog RF/baseband frontend, PWM-based DAC output, and a TFT spectrum display.
-
-The project is currently a working prototype.
 
 ---
 
@@ -51,10 +49,11 @@ Analog subsystem includes:
 
 Main system components:
 
-- STM32F103 microcontroller
-- SI5351 clock generator
-- TFT display (ILI9341)
-- Encoder and button interface
+- STM32F103 microcontroller  
+- SI5351 clock generator  
+- Analog RF/baseband frontend  
+- TFT spectrum display  
+- Encoder and button interface  
 
 ---
 
@@ -68,10 +67,12 @@ Main system components:
 
 ## ⚙️ Firmware
 
-Precompiled firmware is available:
+Precompiled firmware binaries:
 
-
-Firmware/BlueSDR_v0.1_04072026.hex
+| Version | Release Date | File Path | Status |
+| :--- | :--- | :--- | :--- |
+| **v0.2** | 28.07.2026 | `Firmware/BlueSDR_v0.2_28072026.hex` | **Latest (Stable)** |
+| **v0.1** | 04.07.2026 | `Firmware/BlueSDR_v0.1_04072026.hex` | Outdated Prototype |
 
 
 ### Flashing
@@ -87,25 +88,26 @@ STM32F103C8T6 (Blue Pill)
 
 ---
 
-## 📊 Features
+## 📊 Features & Changelog (v0.2)
 
-### Receiver
-- Real-time FFT spectrum display
-- Waterfall visualization
-- S-meter (signal level)
-- AGC / dynamic gain control
-- Digital filtering chain
+### Receiver & DSP
+- **SI5351 Calibration:** Added precise clock generator calibration.
+- **I-Q Channel Tuning:** Phase and balance adjustment for mirror channel rejection.
+- **Advanced AGC:** Dynamic gain control with adjustable Attack, Release, and Threshold.
+- **Modulation Modes:** Quick switching between modes, including newly added **AM modulation**.
+- **Bandwidth Control:** Independent bandwidth adjustment for each modulation type.
+- **Visuals:** Real-time FFT spectrum and waterfall display with active bandwidth visualization.
+- **Audio:** Smooth volume regulation.
 
 ### Transmitter
-- Baseband processing
-- Gain control and compression
-- PWM DAC output
+- Baseband processing.
+- Microphone compressor with full dynamic control (Attack, Release, Threshold).
+- PWM DAC output.
 
-### User Interface
-- TFT SPI display
-- Rotary encoder tuning
-- Band selection
-- Basic control menu
+### User Interface & System
+- TFT SPI display with waterfall.
+- Rotary encoder tuning and step selection.
+- **State Saving:** Non-volatile memory storage for transceiver state (Bandwidth, Modulation, Band, VFO, Volume, and Tuning Step).
 
 ---
 
@@ -114,7 +116,7 @@ STM32F103C8T6 (Blue Pill)
 - Experimental SDR platform
 - Real-time fixed-point DSP (Q15/Q31)
 - Hybrid analog + digital architecture
-- Prototype stage (v0.1)
+- Current version: v0.2 stable prototype
 
 ---
 

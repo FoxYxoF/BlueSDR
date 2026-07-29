@@ -415,14 +415,14 @@
               <FilePath>.\init.h</FilePath>
             </File>
             <File>
-              <FileName>ILI9341_GFX.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\ILI9341_GFX.c</FilePath>
-            </File>
-            <File>
               <FileName>ILI9341_GFX.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\ILI9341_GFX.h</FilePath>
+            </File>
+            <File>
+              <FileName>ILI9341_GFX.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\ILI9341_GFX.c</FilePath>
             </File>
             <File>
               <FileName>fonts.h</FileName>
@@ -443,6 +443,26 @@
               <FileName>si5351.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\si5351.h</FilePath>
+            </File>
+            <File>
+              <FileName>menu.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\menu.c</FilePath>
+            </File>
+            <File>
+              <FileName>menu.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\menu.h</FilePath>
+            </File>
+            <File>
+              <FileName>config.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\config.c</FilePath>
+            </File>
+            <File>
+              <FileName>config.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\config.h</FilePath>
             </File>
           </Files>
         </Group>

@@ -32,6 +32,10 @@ char old_txt_freq[12] = {0};     // Для ILI9341_Draw_MainFrec храним т
 uint16_t smeter_min_db = 60;  // Порог шума (подбирается руками в меню или коде) "S-Meter Noise Floor"
 uint16_t smeter_scale  = 359; // Будет рассчитан автоматически (Q8)
 
+extern uint8_t	  mode;                       // Модуляция  (0:SW 1:LSB 2:USB 3:AM 4:FM)
+extern uint16_t   bandwidth[];                 // Полосы фильтра зч под индексы модуляции 
+         
+
 static const uint16_t waterfall_palette_rainbow[256] = {
     0x0000, 0x0002, 0x0004, 0x0006, 0x0009, 0x000B, 0x000D, 0x000F, 0x0011, 0x0014, 0x0016, 0x0018, 0x001A, 0x001D, 0x001F, 0x00BF,
     0x015F, 0x01FF, 0x029F, 0x033F, 0x03DF, 0x047F, 0x051F, 0x05BF, 0x065F, 0x06FF, 0x079F, 0x083F, 0x08DF, 0x097F, 0x0A1F, 0x0ABF,
@@ -592,52 +596,77 @@ void apply_smoothing(q15_t* new_mag) {
         new_mag[i] = smoothed_mag[i];
     }
 }
-// водопад FFT
 void ILI9341_Draw_Waterfall(uint16_t* data) {
-	uint16_t wf;
-  uint16_t intensity;
-  int16_t target_x;
-	
-	apply_smoothing(data); // усредняем водопад
-	for(uint16_t i=0; i<256; i++){
-	  intensity = data[i];//magnitude_to_db_pixel(data[i]/*<<2*/);
-		// 2. ЖЕСТКО ограничиваем диапазон 0-255
-    if (intensity > 255) intensity = 255; 
-		// 2. Берем готовый цвет из палитры
-    wf = waterfall_palette_lava[intensity];
-		// 3. FFT Shift: частота 0 должна быть в центре (индекс 128)
-		// Входной массив CFFT: [0..127] - полож., [128..255] - отриц.
-		// Чтобы 0 был в центре:
-		if (i < 128) target_x = i + 128; // Положительные уходят вправо
-		else target_x = i - 128;         // Отрицательные уходят влево
-		// 4. Заполнение буфера (big-endian для ILI9341)
-		buf_disp[target_x * 2]     = (uint8_t)(wf >> 8);
-		buf_disp[target_x * 2 + 1] = (uint8_t)(wf & 0xFF);
+    uint16_t wf;
+    uint16_t intensity;
+    int16_t target_x;
+    
+    apply_smoothing(data); // усредняем водопад
+    
+    // 1. Переводим Гц полосы в пиксели
+    uint16_t band_hz = bandwidth[mode]; 
+    uint16_t band_pixels = band_hz / (42682 >> 8); 
+    
+    // 2. Инициализируем границы по умолчанию (Для SW, AM, FM — это полуполоса ФНЧ, раскрывается в обе стороны)
+    uint16_t band_left  = 128 - band_pixels;
+    uint16_t band_right = 128 + band_pixels;
+    
+    // 3. Корректируем границы для однополосной модуляции (SSB)
+    if (mode == 1) {        // LSB (Нижняя): в вашем FFT уходит вниз от центра
+        band_left  = 128;
+        band_right = 128 + band_pixels;
+    } 
+    else if (mode == 2) {   // USB (Верхняя): в вашем FFT уходит вверх от центра
+        band_left  = 128 - band_pixels;
+        band_right = 128;
     }
-	buf_disp[254] = 0b00000100;
-	buf_disp[255] = 0b00000000;
-	buf_disp[256] = 0b11111000;
-	buf_disp[257] = 0b00000000;
-	buf_disp[258] = 0b00000100;
-	buf_disp[259] = 0b00000000;
-	ILI9341_Set_Address(320-inc_wf, 0, 320-inc_wf, 240);
-	DISP_DC_DATA;
-	DISP_CS_SELECT;
-		for(i=16; i<496; i++){ 
-			
-			while(!(DISP_SPI->SR & SPI_SR_TXE)); 
-			SPI1_DR_8bit = buf_disp[i];
-		}
-	while(!(DISP_SPI->SR & SPI_SR_TXE)); 
-  while(DISP_SPI->SR & SPI_SR_BSY);	
-  DISP_CS_UNSELECT;//*/
+
+    // 4. Основной цикл обработки спектра
+    for(uint16_t i = 0; i < 256; i++){
+        intensity = data[i];
+        if (intensity > 255) intensity = 255; 
+        
+        wf = waterfall_palette_lava[intensity];
+        
+        // FFT Shift: частота 0 в центре (индекс 128)
+        if (i < 128) target_x = i + 128; 
+        else target_x = i - 128;         
+        
+        // ПРИМЕНЕНИЕ ЭФФЕКТА ВЫДЕЛЕНИЯ ПОЛОСЫ
+        if (target_x >= band_left && target_x <= band_right) {
+            // Легкий полупрозрачный зеленый (12.5% зеленого)
+            uint16_t wf_div8 = (wf & 0xE79C) >> 3; 
+            uint16_t wf_875  = wf - wf_div8;       
+            uint16_t green_12 = 0x00E0; 
+            wf = wf_875 + green_12;     
+        }
+
+        // Заполнение буфера (big-endian для ILI9341)
+        buf_disp[target_x * 2]     = (uint8_t)(wf >> 8);
+        buf_disp[target_x * 2 + 1] = (uint8_t)(wf & 0xFF);
+    }
+
+    // Рисуем центр (визир) поверх всего
+    buf_disp[254] = 0x07; buf_disp[255] = 0xE0; 
+    buf_disp[256] = 0x07; buf_disp[257] = 0xE0;
 		
-	ILI9341_Set_Scroll_Margins(0, 260); // устанавливаем область прокрутки
-	ILI9341_Scroll_To(inc_wf); // прокручиваем
-	inc_wf++;
-	if (inc_wf>60){
-		inc_wf = 0;
-	}
+		ILI9341_Set_Address(320-inc_wf, 0, 320-inc_wf, 240);
+		DISP_DC_DATA;
+		DISP_CS_SELECT;
+				for(i=16; i<496; i++){ 				
+						while(!(DISP_SPI->SR & SPI_SR_TXE)); 
+						SPI1_DR_8bit = buf_disp[i];
+				}
+		while(!(DISP_SPI->SR & SPI_SR_TXE)); 
+		while(DISP_SPI->SR & SPI_SR_BSY);	
+		DISP_CS_UNSELECT;//*/
+			
+		ILI9341_Set_Scroll_Margins(0, 260); // устанавливаем область прокрутки
+		ILI9341_Scroll_To(inc_wf); // прокручиваем
+		inc_wf++;
+		if (inc_wf>60){
+				inc_wf = 0;
+		}
 }
 
 void ILI9341_Draw_MainFrec(uint16_t x, uint16_t y, uint32_t freq){
@@ -697,23 +726,34 @@ void format_freq(uint32_t f, char *out) {
     }
 }
 
-void format_var(uint32_t f, char *out){ // Переменную в строку
+void format_var(int32_t f, char *out){ // Переменную в строку
     // Заполняем пробелами
     for(int n = 0; n < 8; n++) out[n] = ' ';   
     out[8] = '\0'; // Терминатор строки
     int pos = 7; // Начинаем заполнение с самого конца 
 
     if (f == 0) {
-			out[7] = '0';
-			return; 
-		}
-    while (f > 0 && pos >= 0) {
-        out[pos--] = (f % 10) + '0';
-        f /= 10;
+        out[7] = '0';
+        return; 
+    }
+
+    // Запоминаем знак и переводим в положительное число через uint32_t
+    int is_negative = (f < 0);
+    uint32_t u_f = is_negative ? (uint32_t)(-f) : (uint32_t)f;
+
+    // Расщепляем число на цифры
+    while (u_f > 0 && pos >= 0) {
+        out[pos--] = (u_f % 10) + '0';
+        u_f /= 10;
+    }
+
+    // Если число было отрицательным, ставим минус перед ним
+    if (is_negative && pos >= 0) {
+        out[pos] = '-';
     }
 }
 
-void ILI9341_Draw_Menu_Var(uint16_t x, uint16_t y, uint32_t var){ // Рисуем переменные в меню
+void ILI9341_Draw_Menu_Var(uint16_t x, uint16_t y, int32_t var){ // Рисуем переменные в меню
     char new_txt_buf[8];
     format_var(var, new_txt_buf); // Формируем новую строку
 		ILI9341_WriteString(x, y, new_txt_buf, Font_11x18, GREEN, MYFON);
@@ -753,9 +793,9 @@ void ILI9341_Draw_Scale(){
 			ILI9341_Draw_Horizontal_Line(250, 119-(i*256/44), 10, BORDERCL);
 		}
 	}
-	ILI9341_Draw_Horizontal_Line(250, 118, 10, BORDERCL);
-	ILI9341_Draw_Horizontal_Line(250, 119, 10, RED);
-	ILI9341_Draw_Horizontal_Line(250, 120, 10, BORDERCL);
+
+	ILI9341_Draw_Horizontal_Line(250, 119, 10, GREEN);
+	ILI9341_Draw_Horizontal_Line(250, 120, 10, GREEN);
 
 }
 
@@ -925,27 +965,7 @@ void ILI9341_Draw_Smetr(q15_t value){
  
 }
 
-void Draw_Step(uint16_t step){ // Рисуем плашки под основной частотой
-	ILI9341_Draw_Rectangle(70+16*6, 108+26, 16*5, 2, MYFON);
-	switch (step) {
-			case 1: 
-					// 
-					ILI9341_Draw_Rectangle(63+16*10, 108+26, 16, 2, GREEN);
-					break;
-			case 10: 
-					// 
-					ILI9341_Draw_Rectangle(63+16*9, 108+26, 16, 2, GREEN);
-					break;
-			case 100: 
-					//
-					ILI9341_Draw_Rectangle(63+16*8, 108+26, 16, 2, GREEN);
-					break;
-			case 1000: 
-					// 
-					ILI9341_Draw_Rectangle(63+16*6, 108+26, 16, 2, GREEN);
-					break;
-	}
-}
+
 
 //DRAW LINE FROM X,Y LOCATION to X,Y+Height LOCATION
 void ILI9341_Draw_Vertical_Line(uint16_t X, uint16_t Y, uint16_t Height, uint16_t Colour)

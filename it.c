@@ -7,174 +7,75 @@
 //bool trg = false;
 ////////////////////// Основная логика и для сохранения /////////////////////////////////////
 volatile bool rx_tx_fl = false;                  // Прием(0) передача(1)
-uint32_t   main_frec =  7100000;              // Основная частота
-volatile bool a_b_frec = 1;                   // частота A(0), B(1)
-uint8_t    att_pre = 0;                       // Аттеньюатор/напрямую/предусилитель
-uint8_t    mod = 0;                           // Модуляция sw lsb usb am fm
-uint8_t    band_idx = 2;                      // Текущий диапазон
-uint16_t   step = 100;                        // Шаг перестройки
 
-int16_t    cal_si = 5213;                     // Калибровка si
-int32_t    cal_fase = 0;                      // Калибровка фазы
-int32_t    cal_balance = 0;                   // Калибровка баланса фаз
+int16_t    cal_si = 5213;                // Калибровка si
+int16_t    cal_fase = 40;                 // Калибровка фазы
+int16_t    cal_balance = 100;              // Калибровка баланса фаз
 
-uint32_t   bandpass_ranges[5] =               // Диапазоны полосового фильтра и фнч
+uint8_t    waterful_gain = 2;            // Усиление водопада биты или 6дб
+uint32_t   bandpass_ranges[5] =          // Диапазоны полосового фильтра и фнч
  {2000000, 4000000, 8000000, 16000000, 30000000};
-uint32_t   bands_frec_a[9] =                  // Диапазоны частота A
-   {1875000, 3630000, 7090000, 10125000, 14200000, 18150000, 21250000, 24950000, 28500000};
-uint32_t   bands_frec_b[9] =                  // Диапазоны частота B
-   {1875100, 3630100, 7090100, 10125100, 14200100, 18150100, 21250100, 24950100, 28500100};
-uint8_t    bands_att_pre[9] =                 // Диапазоны аттеньюатор(0)/напрямую(1)/предусилитель(2)
-   {0, 0, 1, 1, 1, 2, 2, 2, 2};                           
-uint8_t    bands_mod_a[9] =                   // Диапазоны модуляция A cw(0), ssb(1), am(2), fm(3)
-   {1, 1, 1, 0, 1, 1, 1, 1, 1};               // 30м: CW(0), остальные: SSB(1)
-uint8_t    bands_mod_b[9] =                   // Диапазоны модуляция B cw(0), ssb(1), am(2), fm(3)
-   {1, 1, 1, 0, 1, 1, 1, 1, 1};               // 30м: CW(0), остальные: SSB(1)
-uint16_t   bandwidth[4] =                     // Полосы фильтра зч под индексы модуляции
-   {500, 2700, 5000, 5000};                   // 0:cw, 1:ssb, 2:am, 3:fm     /*  */  
-///////////////////////////////// меню настроек ///////////////////////////////////////////
-bool       menu_fl = 0;                       // Флаг фхода в меню настроек
-bool       sub_menu_fl = 0;                   // Флаг фхода в подменю
-const char* MAIN_MENU[] = {
-	  "Bandwidth",         // 0
-    "Calibration",       // 1
-    "Waterfall",         // 2
-    "AGC",               // 3
-    "Mic Limiter",       // 4
-	  "Band-Pass Filter",  // 5
-	  "Reserved",          // 6
-    "Exit"               // 7
-};
 
-const uint8_t MAIN_MENU_SIZE = sizeof(MAIN_MENU) / sizeof(MAIN_MENU[0]);
+uint16_t   bandwidth[5] =                 // Полосы фильтра зч под индексы модуляции
+   {500, 2800, 2800, 5000, 5000};         // 0:cw, 1:lsb, 2:usb, 3:am  4:fm    /*  */  
+	 
 
-// 0. Подменю "Bandwidth"
-const char* SUB_0[] = {
-    "CW",
-    "SSB",
-	  "AM",
-	  "FM",
-    "Back"
-};
-const uint8_t SUB_0_SIZE = sizeof(SUB_0) / sizeof(SUB_0[0]);
+extern trx_state_t     trx_state;         // Состояние трансивера
+extern trx_state_f     trx_state_flag;    // Флаги состояния трансивера
+extern bool            menu_fl;           // Флаг входа в меню настроек
 
-// 1. Подменю "Calibration"
-const char* SUB_1[] = {
-    "si5351",
-    "Phase",
-	  "Balance",
-    "Back"
-};
-const uint8_t SUB_1_SIZE = sizeof(SUB_1) / sizeof(SUB_1[0]);
-
-// 2. Подменю "Waterfall"
-const char* SUB_2[] = {
-    "Range",
-    "Pallet",
-    "Back"
-};
-const uint8_t SUB_2_SIZE = sizeof(SUB_2) / sizeof(SUB_2[0]);
-
-// 3. Подменю "AGC"
-const char* SUB_3[] = {
-    "Attack",
-    "Release",
-    "Back"
-};
-const uint8_t SUB_3_SIZE = sizeof(SUB_3) / sizeof(SUB_3[0]);
-
-// 4. Подменю "Mic Limiter"
-const char* SUB_4[] = {
-    "Attack",
-    "Release",
-	  "Gain",
-    "Back"
-};
-const uint8_t SUB_4_SIZE = sizeof(SUB_4) / sizeof(SUB_4[0]);
-
-// 5. Подменю "Band-Pass Filter"
-const char* SUB_5[] = {
-    "Filter 1",
-    "Filter 2",
-		"Filter 3",
-		"Filter 4",
-		"Filter 5",
-    "Back"
-};
-const uint8_t SUB_5_SIZE = sizeof(SUB_5) / sizeof(SUB_5[0]);
-
-// 6. Подменю "Reserved"
-const char* SUB_6[] = {
-    "Reserved 1",
-    "Reserved 2",
-    "Back"
-};
-const uint8_t SUB_6_SIZE = sizeof(SUB_6) / sizeof(SUB_6[0]);
-// --- ТАБЛИЦА СВЯЗЕЙ (КАРТА МЕНЮ) ---
-// Индекс в этой таблице = Номер пункта главного меню
-const char** ALL_SUB_MENUS[] = {
-    SUB_0,    // Индекс 0 (Привязано к "Bandwidth")
-    SUB_1,    // Индекс 1 (Привязано к "Calibration")
-    SUB_2,    // Индекс 2 (Привязано к "Waterfall")
-    SUB_3,    // Индекс 3 (Привязано к "AGC")
-    SUB_4,    // Индекс 4 (Привязано к "Mic Limiter")
-    SUB_5,    // Индекс 5 (Привязано к "Band-Pass Filter")
-    SUB_6,    // Индекс 6 (Привязано к "Reserved")
-    0         // Индекс 7 (Пусто для   "Exit", подменю нет)
-};
-
-// Таблица размеров подменю для контроля прокрутки
-const uint8_t SUB_MENU_SIZES[] = {
-    SUB_0_SIZE,  //
-    SUB_1_SIZE,  //
-    SUB_2_SIZE,  //
-    SUB_3_SIZE,  //
-    SUB_4_SIZE,  //
-    SUB_5_SIZE,  //
-    SUB_6_SIZE,  //
-    0            // Для Exit подменю нет
-};
-
-// Инициализация переменных навигации (начинаем с Главного меню, 0-й строки)
-volatile uint8_t current_menu = 0;
-volatile uint8_t current_submenu = 0;
 ///////////////////////////// Буферы  //////////////////////////////////////
-uint16_t   adcData[64];                 // Буфер сырых данных с АЦП1 и АЦП2
-uint16_t   adc1 = 0;                    // Апскейл на 16/2 с АЦП1 (15бит)
-uint16_t   adc2 = 0;                    // Апскейл на 16/2 с АЦП2 (15бит)
-q15_t      in_I_ch = 0;                 // Входной сигнал In-phase   (Re) 15бит без постоянной составляющей adc1-16384
-q15_t      in_Q_ch = 0;                 // Входной сигнал Quadrature (Im) 15бит без постоянной составляющей adc2-16384
-q15_t      out_I_ch = 0;                // Выдной сигнал 
-q15_t      out_Q_ch = 1;                // Выдной сигнал 
-q15_t      in_I_up = 0;                 // Входной сигнал апскей на два
-q15_t      in_Q_up = 0;                 // Входной сигнал апскей на два
+uint16_t   adcData[64];                   // Буфер сырых данных с АЦП1 и АЦП2
+uint16_t   adc1 = 0;                      // Апскейл на 16/2 с АЦП1 (15бит)
+uint16_t   adc2 = 0;                      // Апскейл на 16/2 с АЦП2 (15бит)
+q15_t      in_I_ch = 0;                   // Входной сигнал In-phase   (Re) 15бит без постоянной составляющей adc1-16384
+q15_t      in_Q_ch = 0;                   // Входной сигнал Quadrature (Im) 15бит без постоянной составляющей adc2-16384
+q15_t      out_I_ch = 0;                  // Выдной сигнал 
+q15_t      out_Q_ch = 1;                  // Выдной сигнал 
+q15_t      in_I_up = 0;                   // Входной сигнал апскей на два
+q15_t      in_Q_up = 0;                   // Входной сигнал апскей на два
 ///////////////// CIC фильтр ////////////////////////////////////////////////////////////
 static int32_t i_i1 = 0, i_i2 = 0, i_i3 = 0; // Секция интеграторов для I
 static int32_t i_c1_z1 = 0, i_c2_z1 = 0, i_c3_z1 = 0; // Секция гребенки для I
 
 static int32_t q_i1 = 0, q_i2 = 0, q_i3 = 0; // Секция интеграторов для Q
 static int32_t q_c1_z1 = 0, q_c2_z1 = 0, q_c3_z1 = 0; // Секция гребенки для Q
+
+// Для перехода 42-21кгц
+static int32_t i_int1 = 0, i_int2 = 0, i_int3 = 0;
+static int32_t q_int1 = 0, q_int2 = 0, q_int3 = 0;
+// Comb
+static int32_t i_d1 = 0, i_d2 = 0, i_d3 = 0;
+static int32_t q_d1 = 0, q_d2 = 0, q_d3 = 0;
 ////////// буферы I и Q и LPF каналов ////////////////////////////////////////////////////////
-#define buff_size 256                   // размер буферов
-#define buff_size_half 128              // размер половины буферов
-q15_t in_raw_i [buff_size];             // входной массив I
-q15_t in_raw_q [buff_size];             // входной массив Q
-q15_t out_ht_q [buff_size];             // выходной массив Q после Гильберта
-q31_t in_lpf   [buff_size];             // входной массив ФНЧ
-q31_t out_lpf  [buff_size];             // выходной массив ФНЧ
+#define buff_size 256                     // размер буферов
+#define buff_size_half 128                // размер половины буферов
+q15_t in_raw_i [buff_size];               // входной массив I
+q15_t in_raw_q [buff_size];               // входной массив Q
+q15_t out_ht_q [buff_size];               // выходной массив Q после Гильберта
+q31_t in_lpf   [buff_size];               // входной массив ФНЧ
+q31_t out_lpf  [buff_size];               // выходной массив ФНЧ
 ///////// Коеффициенты филтра Гилбер ///////////////////////////////////////////////////
-#define   delay_hil    256+63               // задержка преобразования Гильберта = (длинна фильтра/2) -1
+#define   delay_hil    319                // задержка преобразования Гильберта = размер буфера + (длинна фильтра/2) - 1,  256 + (128/2) - 1 = 319;
 q15_t     coeff_hil_q15[n_coeff_hil+1];   // коеффициенты фильтра
 q15_t     pstate_hil[n_coeff_hil + block_size_h + 1];// массив состояний
-q15_t     delay_arr[delay_hil];         // массив задержки Гилберта
+q15_t     delay_arr[delay_hil];           // массив задержки Гилберта
 arm_fir_instance_q15 f_hil;
+///////////// Модуляция ////////////////////////	
+uint8_t	  mode = 3;                       // Модуляция  (0:SW 1:LSB 2:USB 3:AM 4:FM)
+
+
+
 //////////// ФНЧ на БИХ /////////////////
 // Структура и буферы для ФНЧ
 extern arm_biquad_casd_df1_inst_q31 S_LPF;
-extern q31_t lpf_coeffs[];    // [b0, b1, b2, a1, a2]
-extern q31_t lpf_state[];     // Состояние фильтра (нужно 4 на одну секцию)
-extern arm_biquad_casd_df1_inst_q31 S_Phase_I, S_Phase_Q;
-/////////////////////   ФВЧ БИХ 2 порядок ////////////////////////////////
+extern q31_t lpf_coeffs[8 * 5];       // рабочий
+extern q31_t lpf_coeffs_new[8 * 5];   // расчетный
+extern q31_t lpf_state[8 * 4];        // Состояние фильтра (нужно 4 на одну секцию)
+extern volatile uint8_t lpf_new;
+extern uint8_t lpf_stages;            // Порядок БИХ ФНЧ биквада
+
+/////////////////////   ФВЧ БИХ 3 порядок ////////////////////////////////
  /* Примеры для Fs = 21341 Гц:
  *   SHIFT = 4  =>  2^4 = 16  =>  Fc = 21341 / (6.28 * 16)  ? 212 Гц
  *   SHIFT = 5  =>  2^5 = 32  =>  Fc = 21341 / (6.28 * 32)  ? 106 Гц  
@@ -186,39 +87,32 @@ extern arm_biquad_casd_df1_inst_q31 S_Phase_I, S_Phase_Q;
  * в -3 dB сместится чуть выше (примерно в 1.5 раза выше, чем Fc одного каскада).
  * То есть при SHIFT = 5 общая точка -3 dB будет в районе 150-160 Гц, что 
  * идеально завалит помеху 70 Гц (она уйдет в зону глубокого подавления). */
-#define HPF_SHIFT  4  // Жесткая константа для компилятора 
-
+#define HPF_SHIFT  3  // ФВЧ
 // Глобальные переменные состояния фильтра (обнулить при старте процессора)
 static int64_t audio_lpf1 = 0;
 static int64_t audio_lpf2 = 0;
 static int64_t audio_lpf3 = 0;
 // Счетчик для мягкого старта при включении
 static uint16_t init_counter = 0;
-/////////////////// All-passфазовращатель ////////////////////////////////
-extern q31_t statesA[]; // 7 для y[n-1], 7 для x[n-1]
-extern q31_t statesB[];
-// Коэффициенты ветки А и B
-extern q31_t coeffsA[];
-extern q31_t coeffsB[];
-extern arm_biquad_casd_df1_inst_q31 S_AP_A, S_AP_B;
+
 ///////////////////// FFT для водопада ///////////////////////////////////
 arm_cfft_instance_q15 cfft;             // Структура состояний для arm_cfft_q15
 q15_t complex_in_fft[512];              // Входной массив для БПФ{re, im, re, im...}
 uint16_t fft_size = 256;                // Размер массива FFT
 /////////////////////	 Динамика(компрессор АРУ) ///////////////////////////
-// AGC_Config
-//    int16_t threshold;  // Порог срабатывания (например, 1024 или 2048)
-//    int16_t attack;     // Скорость атаки (сдвиг >> n, меньше n = быстрее)
-//    int16_t release;    // Скорость восстановления (шаг прибавления к Gain)
-// * Для частоты дискретизации Fs = 21000 Гц упрощенная формула:
-// * T_мс = 2^N / 21
-// Настройки для приема (Медленное АРУ)
-const AGC_Config rx_agc = {500, 3, 8}; // Быстрая атака, быстрое отпускание(10 бит ограничение)
-// Настройки для передачи (Быстрый компрессор)
-const AGC_Config tx_comp = {500, 3, 12}; // Быстрая атака, плавное отпускание(10 бит ограничение)
-
-static int32_t rx_env, rx_gain = 32768;
-static int32_t tx_env, tx_gain = 32768;
+// (масштабирование 9бит)
+AGC_Config rx_agc  = {// Настройки компрессора на прием
+  .threshold_bits = 9, 
+	.attack = 3, 
+	.release = 8, 
+  .env = 0, 
+  .gain = 32768}; 
+AGC_Config tx_comp = { // Настройки компрессора на передачу
+  .threshold_bits = 9, 
+	.attack = 1, 
+	.release = 12, 
+  .env = 0, 
+  .gain = 32768}; 
 /**/
 ///////////////////////// S - metr  ///////////////////////////////////////
 q15_t s_abs = 0;
@@ -294,17 +188,24 @@ void HardFault_Handler(void) {
 }
 
 
+
+
 void TIM4_IRQHandler(void) {
     if (TIM4->SR & TIM_SR_UIF) {
         TIM4->SR &= ~TIM_SR_UIF;
-
+				if (lpf_new) // Если обновились коэфициенты ФНЧ
+				{
+						lpf_new = 0;
+						// Переинициализируем фильтр на новое количество каскадов
+						arm_biquad_cascade_df1_init_q31(&S_LPF, lpf_stages, lpf_coeffs_new, lpf_state, 1);
+				}
         // Если обработали первую половину буфера
         if ((c_buff >= buff_size_half) && (hil_half_fl)/**/) {
             // 1. Сначала считаем ФНЧ для ПЕРВОЙ половины
             arm_biquad_cascade_df1_q31(&S_LPF, &in_lpf[0], &out_lpf[0], buff_size_half);
 					  //arm_fir_fast_q15(&f_hil, &in_raw_q[0], &out_ht_q[0], buff_size_half);
 					  fast_hilbert_q15_custom(&f_hil, &in_raw_q[0], &out_ht_q[0], buff_size_half); // Своя реализация Гильберта
-            // 2. Затем считаем фазовращатель на основе свежего out_lpf[0]
+
             
             hil_half_fl = 0;
         }
@@ -314,7 +215,7 @@ void TIM4_IRQHandler(void) {
             arm_biquad_cascade_df1_q31(&S_LPF, &in_lpf[buff_size_half], &out_lpf[buff_size_half], buff_size_half);
 				  	//arm_fir_fast_q15(&f_hil, &in_raw_q[buff_size_half], &out_ht_q[buff_size_half], buff_size_half); 
 				  	fast_hilbert_q15_custom(&f_hil, &in_raw_q[buff_size_half], &out_ht_q[buff_size_half], buff_size_half); // Своя реализация Гильберта
-            // 2. Затем фазовращатель для ВТОРОЙ половины
+
             
             hil_half_fl = 1;
         }
@@ -322,7 +223,7 @@ void TIM4_IRQHandler(void) {
 }
 
 
-void Process_IQ_Buffer(const uint16_t *p_data, int16_t *out_I, int16_t *out_Q) {
+__STATIC_FORCEINLINE void Process_IQ_Buffer(const uint16_t *p_data, int16_t *out_I, int16_t *out_Q) {
     // Копируем состояния в локальные переменные для размещения в регистрах процессора
     int32_t loc_i1 = i_i1; int32_t loc_i2 = i_i2; int32_t loc_i3 = i_i3;
     int32_t loc_q1 = q_i1; int32_t loc_q2 = q_i2; int32_t loc_q3 = q_i3;
@@ -404,13 +305,31 @@ void DMA1_Channel1_IRQHandler(void) {
 		
 		Fill_buff(); //Заполняем буферы
 	}
-
 }
+
+void PVD_IRQHandler(void) 
+{
+    if (EXTI->PR & EXTI_PR_PR16)
+    {
+        EXTI->PR = EXTI_PR_PR16; // Сбрасываем флаг EXTI
+
+        // Проверяем: питание РЕАЛЬНО упало ниже 2.9V?
+        if (PWR->CSR & PWR_CSR_PVDO) 
+        {
+            __disable_irq(); // Выключаем остальные прерывания, чтобы не мешали
+
+            TRX_State_Save(); // Мгновенно шьем во Flash!
+
+            while (1); // Засыпаем навечно, ждем полной разрядки конденсатора
+        }
+    }
+}
+
 //DC Blocker
 //IIR 
 //3-stage
 // Блокировка постоянной. ФВЧ БИХ 3 порядка (18 dB/окт) 
-static __inline void Process_Audio_HPF(q31_t *sample) {
+__STATIC_FORCEINLINE void Process_Audio_HPF(q31_t *sample) {
     // Читаем 32-битное значение из памяти в регистр процессора
     int32_t audio_buf = *sample;
 
@@ -444,26 +363,68 @@ static __inline void Process_Audio_HPF(q31_t *sample) {
     *sample = (q31_t)(audio_out_16);
 }
 
-/// Заполняем буферы в прерывании DMA1
-void Fill_buff(void){	
-	
-	if (upscale_flag){// если передескретизация выполнена
 
+
+/// ЦОС прерывание от DMA1
+__STATIC_FORCEINLINE void Fill_buff(void){	
+	// калибровка каналов			
+	// 1. Коррекция амплитуды канала I
+	// Умножение в формате Q15: (in_I_ch * cal_balance) >> 15. 
+	// Затем прибавляем к исходному сигналу и аппаратно ограничиваем до 15 бит.
+	int32_t I_cal = (int32_t)in_I_ch + (((int32_t)in_I_ch * cal_balance) >> 15);
+	in_I_ch = (q15_t)__SSAT(I_cal, 15);
+
+	// 2. Коррекция фазы канала Q
+	// Подмешиваем скорректированный канал I в канал Q и снова жестко насыщаем в 15 бит.
+	int32_t Q_cal = (int32_t)in_Q_ch + ((I_cal * cal_fase) >> 15);
+	in_Q_ch = (q15_t)__SSAT(Q_cal, 15);
+	// --------------------
+	// CIC Integrator
+	// --------------------
+	i_int1 += in_I_ch;
+	i_int2 += i_int1;
+	i_int3 += i_int2;
+
+	q_int1 += in_Q_ch;
+	q_int2 += q_int1;
+	q_int3 += q_int2;
+	if (upscale_flag){// если передескретизация выполнена
 		if (!rx_tx_fl){ // Прием/передача
 			// Если прием
-			//in_raw_i[c_buff] = in_I_up;
-			in_raw_q[c_buff] = -in_Q_up;
+			in_raw_q[c_buff] = -in_Q_up; // Отдаем в буфер сырого для преобразования Гильберта
+			// Делаем задержку I канала для выравнивания с преобразованием Гильберта
+			// Коьцевой буфер размером в задержку
+			// Задержка = размер буфера + (длинна фильтра/2) - 1,  256 + (128/2) - 1 = 319;
 			out_I_ch = delay_arr[c_buff_delay];
 	  	delay_arr[c_buff_delay] = in_I_up;
+
+			// CW
+			if(mode == 0){		
+				in_lpf[c_buff] = in_I_up + in_Q_up;
+			}				
+			// LSB
+			if(mode == 1){
+			  in_lpf[c_buff] = out_ht_q[c_buff] + out_I_ch;
+			}
+			// USB
+			if(mode == 2){
+			  in_lpf[c_buff] = out_ht_q[c_buff] - out_I_ch;
+			}
+      // AM
+			if (mode == 3) {
+				// Берем модули I и Q каналов без ветвления
+				int32_t abs_i = (in_I_up ^ (in_I_up >> 31)) - (in_I_up >> 31);
+				int32_t abs_q = (in_Q_up ^ (in_Q_up >> 31)) - (in_Q_up >> 31);
+				// Аппроксимация альфа-бета: Max + Min/4
+				in_lpf[c_buff] = (abs_i > abs_q) ? (abs_i + (abs_q >> 2)) : (abs_q + (abs_i >> 2));
+			}		
 			
-			in_lpf[c_buff] = out_ht_q[c_buff] + out_I_ch;
-			Process_Audio_HPF(&in_lpf[c_buff]);
-			
-			if (out_lpf[c_buff] > s_peak) s_peak = out_lpf[c_buff];
-			
-			out_Q_ch = process_dynamic_gain(out_lpf[c_buff], &rx_agc, &rx_env, &rx_gain);// Ограничение 10бит
-			//if (out_Q_ch > s_peak) s_peak = out_Q_ch;
-			TIM3->CCR4 = ((uint16_t)(out_Q_ch+512))>>2;
+			Process_Audio_HPF(&in_lpf[c_buff]);		// ФВЧ	
+			if (out_lpf[c_buff] > s_peak) s_peak = out_lpf[c_buff];		// Детектор пиков для s-метра	
+			out_Q_ch = process_dynamic_gain(out_lpf[c_buff], &rx_agc);// Ограничение 9бит
+      int16_t out_rx = apply_gain(out_Q_ch, trx_state.volume); // Регулируем громкость
+      out_rx += 512; // переводим значение в положительную область для вывода ШИМ
+			TIM3->CCR4 = (uint16_t)out_rx;
 		}
 		else{
 			// Если передача
@@ -473,9 +434,9 @@ void Fill_buff(void){
 			//s_abs = out_lpf[c_buff];
 			if (s_abs < 0) s_abs = -s_abs;
 			if (s_abs > s_peak) s_peak = s_abs;
-			//s_abs = process_dynamic_gain(in_Q_up, &tx_comp, &tx_env, &tx_gain)<<6; // Ограничение 10бит
-			in_lpf[c_buff] = process_dynamic_gain(in_Q_up, &tx_comp, &tx_env, &tx_gain)<<6; // Ограничение 10бит
-			in_raw_q[c_buff] = (int16_t)__SSAT(out_lpf[c_buff], 16);//
+			//s_abs = process_dynamic_gain(in_Q_up, &tx_comp)<<6; // Ограничение 10бит
+			in_lpf[c_buff] = process_dynamic_gain(in_Q_up, &tx_comp)<<6; // Ограничение 9бит
+			in_raw_q[c_buff] = out_lpf[c_buff];   //
 			out_I_ch = delay_arr[c_buff_delay];
 	  	delay_arr[c_buff_delay] = (int16_t)__SSAT(out_lpf[c_buff], 16);//	
 			out_Q_ch = out_ht_q[c_buff];
@@ -496,21 +457,53 @@ void Fill_buff(void){
 			c_buff_delay = 0; // обнуляем
 		}
 		// обновляем значения для апскейла
-		in_I_up = in_I_ch;
-    in_Q_up = in_Q_ch;
+		//in_I_up = in_I_ch;
+    //in_Q_up = in_Q_ch;
 		upscale_flag = false;
 	}
-	else{ // если нет апскейл на два
-		in_I_up = (in_I_up + in_I_ch);
-    in_Q_up = (in_Q_up + in_Q_ch);
-    upscale_flag = true; // поднимаем флаг
+	else{
+		//------------------------
+		// CIC3 COMB
+		//------------------------
+		int32_t t;
+
+		t = i_int3;
+		in_I_up = t - i_d1;
+		i_d1 = t;
+
+		t = in_I_up;
+		in_I_up = t - i_d2;
+		i_d2 = t;
+
+		t = in_I_up;
+		in_I_up = t - i_d3;
+		i_d3 = t;
+
+
+		t = q_int3;
+		in_Q_up = t - q_d1;
+		q_d1 = t;
+
+		t = in_Q_up;
+		in_Q_up = t - q_d2;
+		q_d2 = t;
+
+		t = in_Q_up;
+		in_Q_up = t - q_d3;
+		q_d3 = t;
+
+
+		in_I_up >>= 2;
+		in_Q_up >>= 2;
+
+		upscale_flag = true;
 	}
 
 	if (!rx_tx_fl){ // Прием
 			// Заполняем массив FFT
 			if ((c_fft < fft_size)&&(!fft_arr_fl)){ // Если массив fft не заполнен
-				complex_in_fft[(c_fft<<1)] = in_Q_up<<2;
-				complex_in_fft[(c_fft<<1)+1] = -in_I_up<<2;     // заполняем re
+				complex_in_fft[(c_fft<<1)] = in_Q_ch<<2;
+				complex_in_fft[(c_fft<<1)+1] = -in_I_ch<<2;     // заполняем re
 				c_fft++;
 			}
 			else{
@@ -528,7 +521,6 @@ void Fill_buff(void){
 				c_fft = 0;
 				fft_arr_fl = true;
 			} 		
-
 	}
 }
 
@@ -563,49 +555,59 @@ void EXTI15_10_IRQHandler(void) { EXTI->PR = EXTI_PR_PR15; Start_Debounce(); }
  * @param pEnv      - указатель на переменную огибающей (static)
  * @param pGain     - указатель на переменную усиления (static)
  */
-// не забыть сделать инлайн
-int16_t process_dynamic_gain(int32_t sample_in, const AGC_Config *cfg, int32_t *pEnv, int32_t *pGain) {
+// Компрессор/ару
+__STATIC_FORCEINLINE int16_t process_dynamic_gain(int32_t sample_in, AGC_Config *cfg) {
     int32_t abs_s = abs(sample_in);
 
-    // 1. Быстрый пиковый детектор огибающей с защитой от "залипания"
-    int32_t env_diff = abs_s - *pEnv;
+    // 1. Быстрый пиковый детектор огибающей
+    int32_t env_diff = abs_s - cfg->env;
     if (env_diff > 0) {
-        *pEnv += (env_diff >> 3); // Быстрая атака
+        uint32_t env_attack_shift = (cfg->attack > 0) ? (cfg->attack - 1) : 0;
+        cfg->env += (env_diff >> env_attack_shift); 
     } else {
-        int32_t release_step = env_diff >> 8;
-        // Защита от бесконечного падения: если сдвиг дал 0, но разница еще есть, принудительно вычитаем 1
+        uint32_t env_release_shift = (cfg->release > 4) ? (cfg->release - 4) : 1;
+        int32_t release_step = env_diff >> env_release_shift;
         if (release_step == 0 && env_diff < 0) release_step = -1;
-        *pEnv += release_step;
+        cfg->env += release_step;
     }
 
-    // 2. Расчет целевого усиления (оптимизированное деленияе)
-    int32_t target_gain = 32768; // 1.0 в Q15
-    if (*pEnv > cfg->threshold) {
-        // Явно переводим в uint32_t. Беззнаковое деление в библиотеках ARM 
-        // компилируется в существенно более короткий и быстрый цикл.
-        uint32_t num = (uint32_t)cfg->threshold << 15;
-        uint32_t den = (uint32_t)(*pEnv);
-        
+    // Вычисляем пороги
+    int32_t sat_level = 1 << cfg->threshold_bits; 
+    int32_t thresh_val = sat_level - (sat_level >> 3);
+
+    // 2. Расчет целевого усиления
+    int32_t target_gain = 32768; 
+    if (cfg->env > thresh_val) {
+        uint32_t num = (uint32_t)thresh_val << 15;
+        uint32_t den = (uint32_t)(cfg->env);
         target_gain = (int32_t)(num / den);
     }
 		
-		
-    // 3. Плавное сглаживание Gain с гарантированным возвратом к 1.0 (32768)
-    int32_t gain_diff = target_gain - *pGain;
+    // 3. Плавное сглаживание Gain
+    int32_t gain_diff = target_gain - cfg->gain;
     if (gain_diff < 0) {
-        *pGain += (gain_diff >> cfg->attack);  // Быстро зажимаем
+        cfg->gain += (gain_diff >> cfg->attack);  
     } else {
         int32_t gain_step = gain_diff >> cfg->release;
-        // Защита от "замерзания": если сдвиг дал 0, но гейн еще не дошел до target_gain, принудительно прибавляем 1
         if (gain_step == 0 && gain_diff > 0) gain_step = 1;
-        *pGain += gain_step;
+        cfg->gain += gain_step;
     }
 		
-    // 4. Применение усиления (Вход * Gain) >> 15
-    int32_t out = (sample_in * (*pGain)) >> 15;
+    // 4. Применение усиления
+    int32_t out = (sample_in * cfg->gain) >> 15;
 
-    // 5. Аппаратное насыщение (Ограничение) средствами Cortex-M3
-    return (int16_t)__SSAT(out, 10);
+    // 5. Мягкое ограничение
+    if (out > (sat_level - 1))  out = sat_level - 1;
+    if (out < -sat_level)       out = -sat_level;
+
+    // 6. Масштабирование
+    if (cfg->threshold_bits < 9) {
+        out <<= (9 - cfg->threshold_bits);
+    } else if (cfg->threshold_bits > 9) {
+        out >>= (cfg->threshold_bits - 9);
+    }
+
+    return (int16_t)out;
 }
 
 void Button_Process(uint8_t code) { // Обработчик нажатия кнопок
@@ -616,54 +618,54 @@ void Button_Process(uint8_t code) { // Обработчик нажатия кнопок
 				
 		case 0x02: // Кнопка 2 (0010)
 			//Шаг перестройки
-		  if(!menu_fl){ // Если не в меню
-				step *= 10;
-				if (step>1000) step = 1;
-				Draw_Step(step);   
+			switch (trx_state.tuning_step)				// Уменьшаем щаг, плашка под символами идет слева на право
+			{
+					case 1000: trx_state.tuning_step = 100;  break;
+					case 100:  trx_state.tuning_step = 10;   break;
+					case 10:   trx_state.tuning_step = 1;    break;
+					default:   trx_state.tuning_step = 1000; break;
 			}
-		  else{ // Если в меню
-				step *= 10;
-				if (step>1000) step = 1;
-				//Draw_Step(step);   
-			}
+			Redraw_Step(trx_state.tuning_step, menu_fl);   // Рисуем шаг
 			break;
 				
-		case 0x03: // Кнопка 3 (0011)
-			ILI9341_WriteString(   30, 30, "    Button 3", Font_11x18, GREEN, MYFON);
+		case 0x03: // Кнопка 3 (0011) Mode
+		  	//Переключем модуляцию
+		    if (mode<4){ mode++; }else{ mode=0; }
+		    if(trx_state.active_vfo==0){ // Если VFO A
+					 trx_state.band_mode_a[trx_state.current_band] = mode;
+				}
+				if(trx_state.active_vfo==1){ // Если VFO B
+					 trx_state.band_mode_b[trx_state.current_band] = mode;
+				}
+				lpf_new = Calculate_lpf_Q31(bandwidth[mode], 21875.0f, &lpf_stages); // Установка полосы пропускания
+				Redraw_mode();        // Перерисовываем модуляцию
 			break;
 				
 		case 0x04: // Кнопка 4 (0100) Band+
 			if(!menu_fl){ // Если не в меню
-				if (band_idx<8) { band_idx++; } else { band_idx=0; }
-		    Refreash_Band();  // Обновляем диапазон
-				Refreash_A_B();   // Обновляем A/B VFO
+				if (trx_state.current_band<8) { trx_state.current_band++; } else { trx_state.current_band=0; }
+		    Redraw_Band();   // Обновляем диапазон
+				Redraw_A_B();    // Обновляем A/B VFO
+				Set_mode();      // Установка режима модуляции из trx_state
+				Redraw_mode();   // Перерисовываем модуляцию
 			} 
 			else{
-				if(!sub_menu_fl){ // Если не в подменю(основное меню)
-					ILI9341_WriteString(   46, current_menu*18, MAIN_MENU[current_menu], Font_11x18, BORDERCL, MYFON);    // Неактивный пункт
-					if (current_menu<MAIN_MENU_SIZE-1){ current_menu++; }
-					else { current_menu=0; }
-					ILI9341_WriteString(   46, current_menu*18, MAIN_MENU[current_menu], Font_11x18, GREEN, MYFON);    // Активный пункт
-				}
-				else{ // Если в подменю
-					ILI9341_WriteString(   46, current_submenu*18, ALL_SUB_MENUS[current_menu][current_submenu], Font_11x18, BORDERCL, MYFON);    // Неактивный пункт
-					if (current_submenu<SUB_MENU_SIZES[current_menu]-1){ current_submenu++; }
-					else { current_submenu=0; }
-					ILI9341_WriteString(   46, current_submenu*18, ALL_SUB_MENUS[current_menu][current_submenu], Font_11x18, GREEN, MYFON);    // Активный пункт
-				}
+        Menu_Up();   // Меню шаг вверх  
 			}
 			break;
 				
 		case 0x05: // Кнопка 5 (0101) VFO A/B
 			//ILI9341_WriteString(   30, 30, "    Button 5", Font_11x18, GREEN, MYFON);
 		  if(!menu_fl){ // Если не в меню
-				if (a_b_frec) {                 // A/B
-					a_b_frec = false;
+				if (trx_state.active_vfo) {                 // A/B
+					trx_state.active_vfo = false;
 				}
 				else {
-					a_b_frec = true;
+					trx_state.active_vfo = true;
 				}/**/
-				Refreash_A_B(); // Обновляем A/B VFO
+				Redraw_A_B(); // Обновляем A/B VFO
+				Set_mode();      // Установка режима модуляции
+				Redraw_mode();   // Перерисовываем модуляцию
 			}
 			break;
 				
@@ -673,65 +675,21 @@ void Button_Process(uint8_t code) { // Обработчик нажатия кнопок
 
 			}
 		  else{ // Если в меню кнопка выбора
-				if(!sub_menu_fl){ // Если в основном меню
-					
-					if(current_menu == MAIN_MENU_SIZE-1){ // Если EXIT
-						current_menu=0;
-					}
-					else{
-						sub_menu_fl = true; // Входим в подменю
-					}
-				}
-				else{
-					if(current_submenu == SUB_MENU_SIZES[current_menu]-1){ // Если Back
-						current_submenu=0;
-						sub_menu_fl = false; // Входим в меню
-					}
-				}
-
-					// Отрисовка меню
-					ILI9341_Draw_Rectangle(46, 0, 243-46, 240, MYFON);
-					if (!sub_menu_fl){// Если в основном меню
-						for(uint8_t i=0; i<MAIN_MENU_SIZE; i++){ 
-							if (i == current_menu){
-								ILI9341_WriteString(   46, i*18, MAIN_MENU[i], Font_11x18, GREEN, MYFON);    // Активный пункт
-							} else{
-								ILI9341_WriteString(   46, i*18, MAIN_MENU[i], Font_11x18, BORDERCL, MYFON); // Неактивный пункт
-							}
-						}
-					}
-					else{ // Если в подменю
-						for(uint8_t i=0; i<SUB_MENU_SIZES[current_menu]; i++){ 
-							if (i == current_submenu){
-								ILI9341_WriteString(   46, i*18, ALL_SUB_MENUS[current_menu][i], Font_11x18, GREEN, MYFON);    // Активный пункт
-							} else{
-								ILI9341_WriteString(   46, i*18,ALL_SUB_MENUS[current_menu][i], Font_11x18, BORDERCL, MYFON); // Неактивный пункт
-							}
-							DrawVarMenu(current_menu, i);
-						}
-					}
+        Menu_Change();  // Выбор подменю по кнопке
+				Menu_Draw();     // Отрисовка меню
 			}
 			break;
 				
-		case 0x07: // Кнопка 7 (0111)
+		case 0x07: // Кнопка 7 (0111) Band-
 			if(!menu_fl){ // Если не в меню
-				if (band_idx>0) { band_idx--; } else { band_idx=8; }
-		    Refreash_Band();  // Обновляем диапазон
-				Refreash_A_B();   // Обновляем A/B VFO
+				if (trx_state.current_band>0) { trx_state.current_band--; } else { trx_state.current_band=8; }
+		    Redraw_Band();  // Обновляем диапазон
+				Redraw_A_B();   // Обновляем A/B VFO
+				Set_mode();      // Установка режима модуляции из trx_state
+				Redraw_mode();   // Перерисовываем модуляцию
 			}
 			else{
-				if(!sub_menu_fl){ // Если не в подменю(основное меню)
-					ILI9341_WriteString(   46, current_menu*18, MAIN_MENU[current_menu], Font_11x18, BORDERCL, MYFON);    // Неактивный пункт
-					if (current_menu>0){ current_menu--; }
-					else { current_menu=MAIN_MENU_SIZE-1; }
-					ILI9341_WriteString(   46, current_menu*18, MAIN_MENU[current_menu], Font_11x18, GREEN, MYFON);    // Активный пункт
-				}
-				else{ // Если в подменю
-					ILI9341_WriteString(   46, current_submenu*18, ALL_SUB_MENUS[current_menu][current_submenu], Font_11x18, BORDERCL, MYFON);    // Неактивный пункт
-					if (current_submenu>0){ current_submenu--; }
-					else { current_submenu=SUB_MENU_SIZES[current_menu]-1; }
-					ILI9341_WriteString(   46, current_submenu*18, ALL_SUB_MENUS[current_menu][current_submenu], Font_11x18, GREEN, MYFON);    // Активный пункт
-				}
+        Menu_Down();   // Меню шаг вниз
 			}
 			break;
 				
@@ -766,7 +724,13 @@ void Button_LongPress_Process(uint8_t code) { // Обработчик нажатия кнопок при д
 			break;
 				
 		case 0x02: // Кнопка 2 (0010)
-
+      if (trx_state_flag.volume_enabled){
+				trx_state_flag.volume_enabled = false;
+			}
+			else{
+				trx_state_flag.volume_enabled = true;
+			}		
+			Redraw_volume();
 			break;
 				
 		case 0x03: // Кнопка 3 (0011)
@@ -780,13 +744,15 @@ void Button_LongPress_Process(uint8_t code) { // Обработчик нажатия кнопок при д
 		case 0x05: // Кнопка 5 (0101)
 			//ILI9341_WriteString(   30, 30, "LongButton 5", Font_11x18, GREEN, MYFON);
 		  if(!menu_fl){ // Если не в меню
-				if (a_b_frec) {                 // A/B
-					bands_frec_a[band_idx] = bands_frec_b[band_idx];
+				if (trx_state.active_vfo) {                 // B=A
+					trx_state.vfo_a_freq[trx_state.current_band] = trx_state.vfo_b_freq[trx_state.current_band];
 				}
-				else {
-          bands_frec_b[band_idx] = bands_frec_a[band_idx];
+				else {                                      // A=B
+          trx_state.vfo_b_freq[trx_state.current_band] = trx_state.vfo_a_freq[trx_state.current_band];
 				}/**/
-				Refreash_A_B(); // Обновляем A/B VFO
+				Redraw_A_B();    // Обновляем A/B VFO
+				Set_mode();      // Установка режима модуляции из trx_state
+				Redraw_mode();   // Перерисовываем модуляцию
 			}
 			break;
 				
@@ -794,41 +760,16 @@ void Button_LongPress_Process(uint8_t code) { // Обработчик нажатия кнопок при д
 			// Переходим в меню настроек
 		  if(!menu_fl){
 				menu_fl = true;
-				// Отрисовка меню
-				ILI9341_Draw_Rectangle(46, 0, 243-46, 240, MYFON);
-				if (!sub_menu_fl){// Если в основном меню
-					for(uint8_t i=0; i<MAIN_MENU_SIZE; i++){ 
-						if (i == current_menu){
-							ILI9341_WriteString(   46, i*18, MAIN_MENU[i], Font_11x18, GREEN, MYFON);    // Активный пункт
-						} else{
-							ILI9341_WriteString(   46, i*18, MAIN_MENU[i], Font_11x18, BORDERCL, MYFON); // Неактивный пункт
-						}
-					}
-				}
-				else{ // Если в подменю
-					for(uint8_t i=0; i<SUB_MENU_SIZES[current_menu]; i++){ 
-						if (i == current_submenu){
-							ILI9341_WriteString(   46, i*18, ALL_SUB_MENUS[current_menu][i], Font_11x18, GREEN, MYFON);    // Активный пункт
-						} else{
-							ILI9341_WriteString(   46, i*18,ALL_SUB_MENUS[current_menu][i], Font_11x18, BORDERCL, MYFON); // Неактивный пункт
-						}
-						DrawVarMenu(current_menu, i);
-					}
-				}
+				
+        Menu_Draw(); // Отрисовка меню
+				//Redraw_Step(trx_state.tuning_step, menu_fl);		// перерисовали шаг
 			}
 			else{
 				menu_fl = false;
-				// Отрисовка основного экрана
-				ILI9341_Draw_Rectangle(46, 0, 243-46, 240, MYFON);
-				if (!rx_tx_fl) {                   // RX/TX
-					ILI9341_WriteString( 46, 108, "R", Font_16x26, GREEN, MYFON); // RX/TX
-				}
-				else {
-					ILI9341_WriteString( 46, 108, "T", Font_16x26, GREEN, MYFON); // RX/TX
-				}
-				Refreash_Band();  // Обновляем диапазон
-				Refreash_A_B(); // Обновляем A/B VFO
-			}			
+        Redraw_Main_Scr();  // Перерисовываем основной экран
+				Set_mode();         // Установка режима модуляции
+			}		
+			
 			break;
 				
 		case 0x07: // Кнопка 7 (0111)
@@ -848,133 +789,5 @@ void Button_LongPress_Process(uint8_t code) { // Обработчик нажатия кнопок при д
 	}
 }
 
-void DrawVarMenu(uint8_t menu_idx, uint8_t sub_idx){ // Отрисовка переменных в меню
-	//ILI9341_Draw_Menu_Var(152, 0, bands_frec_b[band_idx]);
-		switch (menu_idx) {
-		case 0x00: // Bandwidth
-			/*"CW",
-			"SSB",
-			"AM",
-			"FM",
-			"Back"*/
-			switch (sub_idx) {
-			case 0x00: // CW
-          ILI9341_Draw_Menu_Var(152, 0*18, bandwidth[0]);
-				break;
-			case 0x01: // SSB
-          ILI9341_Draw_Menu_Var(152, 1*18, bandwidth[1]);
-				break;
-			case 0x02: // AM
-          ILI9341_Draw_Menu_Var(152, 2*18, bandwidth[2]);
-				break;
-			case 0x03: // FM
-          ILI9341_Draw_Menu_Var(152, 3*18, bandwidth[3]);
-				break;
-			}
-			break;
-				
-		case 0x01: // Calibration
-      /*"si5351",
-      "Phase",
-		  "Balance",
-      "Back"*/
-			switch (sub_idx) {
-			case 0x00: // si5351
-          ILI9341_Draw_Menu_Var(152, 0*18, cal_si);
-				break;
-			case 0x01: // Phase
-          ILI9341_Draw_Menu_Var(152, 1*18, cal_fase);
-				break;
-			case 0x02: // Balance
-          ILI9341_Draw_Menu_Var(152, 2*18, cal_balance);
-				break;
-			}
-			break;
-				
-		case 0x02: // Waterfall
-			/*"Range",
-      "Pallet",
-      "Back"*/
-			switch (sub_idx) {
-			case 0x00: // Range
 
-				break;
-			case 0x01: // Pallet
 
-				break;
-			}
-			break;
-		
-		case 0x03: // AGC
-			/*"Attack",
-      "Release",
-      "Back"*/
-			switch (sub_idx) {
-			case 0x00: // Attack
-
-				break;
-			case 0x01: // Release
-
-				break;
-			}
-			break;
-				
-		case 0x04: // Mic Limiter
-			/*"Attack",
-      "Release",
-	    "Gain",
-      "Back"*/
-			switch (sub_idx) {
-			case 0x00: // Attack
-
-				break;
-			case 0x01: // Release
-
-				break;
-			case 0x02: // Gain
-
-				break;
-			}
-			break;
-				
-		case 0x05: // Band-Pass Filter
-			/*"Filter 1",
-      "Filter 2",
-	  	"Filter 3",
-	  	"Filter 4",
-	  	"Filter 5",
-      "Back"*/
-			switch (sub_idx) {
-			case 0x00: // Filter 1
-          ILI9341_Draw_Menu_Var(152, 0*18, bandpass_ranges[0]);
-				break;
-			case 0x01: // Filter 2
-          ILI9341_Draw_Menu_Var(152, 1*18, bandpass_ranges[1]);
-				break;
-			case 0x02: // Filter 3
-          ILI9341_Draw_Menu_Var(152, 2*18, bandpass_ranges[2]);
-				break;
-			case 0x03: // Filter 4
-          ILI9341_Draw_Menu_Var(152, 3*18, bandpass_ranges[3]);
-				break;
-			case 0x04: // Filter 5
-          ILI9341_Draw_Menu_Var(152, 4*18, bandpass_ranges[4]);
-				break;	
-			}
-			break;
-				
-		case 0x06: // Reserved
-			/*"Reserved 1",
-      "Reserved 2",
-      "Back"*/
-			switch (sub_idx) {
-			case 0x00: // Reserved 1
-
-				break;
-			case 0x01: // Reserved 2
-
-				break;
-			}
-			break;
-	}
-}

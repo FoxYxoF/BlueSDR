@@ -14,15 +14,20 @@ extern q15_t                        out_rfft_lpf_q15[];  // Массив выхода ОБПФ д
 extern q15_t                        coeff_hil_q15[];     // коеффициенты фильтра
 extern q15_t     pstate_hil[n_coeff_hil + block_size_h]; // массив состояний
 
-extern bool       a_b_frec;                              // частота A(0), B(1)
-extern uint8_t    band_idx;                              // Текущий диапазон
-extern uint32_t   bands_frec_a[];                        // Диапазоны частота
-extern uint32_t   bands_frec_b[];                        // Диапазоны частота
+//extern bool       a_b_frec;                              // частота A(0), B(1)
+//extern uint8_t    band_idx;                              // Текущий диапазон
+//extern uint32_t   bands_frec_a[];                        // Диапазоны частота
+//extern uint32_t   bands_frec_b[];                        // Диапазоны частота
 extern uint32_t   bandpass_ranges[];                     // Диапазоны полосового фильтра и фнч
-
+extern trx_state_t                  trx_state;           // Состояние трансивера
+extern trx_state_f                  trx_state_flag;      // Флаги состояния трансивера
+extern uint8_t	                    mode;                // Модуляция  (0:SW 1:LSB 2:USB 3:AM 4:FM)
+extern uint16_t                     bandwidth[5];        // Полосы фильтра зч под индексы модуляции
 extern uint32_t                     main_frec;           // Основная частоа
 extern uint16_t                     step;                // Шаг перестройки
 extern bool                         rx_tx_fl;            // RX/TX
+
+
 // Счетчики
 extern uint16_t   c_fft;             // Счетчик заполнения массива FFT
 extern uint16_t   c_buff;            // Счетчик основных буферов
@@ -33,10 +38,14 @@ extern bool       hil_half_fl;       // Первая/вторая половина основных буферов
 extern bool       upscale_flag;      // Флаг апскейла, понижаем частоту дискритизации до 14.42кГц	
 ////////////////////////////////// ФНЧ на БИХ /////////////////////////////////////
 // Структура и буферы для ФНЧ
-#define LPF_STAGES 8  // 16-й порядок = 8 секций
+//#define LPF_STAGES 8  // 16-й порядок = 8 секций
 arm_biquad_casd_df1_inst_q31 S_LPF;
-q31_t lpf_coeffs[LPF_STAGES*5];    // [b0, b1, b2, a1, a2]
-q31_t lpf_state[LPF_STAGES*4];     // Состояние фильтра (нужно 4 на одну секцию)
+q31_t lpf_coeffs[8 * 5];             // рабочий
+q31_t lpf_coeffs_new[8 * 5];         // расчетный
+q31_t lpf_state[8 * 4];              // Состояние фильтра (нужно 4 на одну секцию)
+volatile uint8_t lpf_new = 0;
+uint8_t lpf_stages = 0;              // Порядок БИХ ФНЧ биквада
+
 /////////////////////////////////////////////////////////////////
 uint32_t stateIndex = 0; // Для самописного Гильберта
 /////////////////// Буферы /////////////////////
@@ -437,6 +446,33 @@ void TIM1_Encoder_Init(void) {  // Инициализация энкодера
     TIM1->CR1 |= TIM_CR1_CEN; //*/
 }
 
+void PWR_Init(void)  { // Инициализация контроля питания
+    
+    RCC->APB1ENR |= RCC_APB1ENR_PWREN;   // Включаем тактирование PWR
+    RCC->APB2ENR |= RCC_APB2ENR_AFIOEN;  // Включаем тактирование AFIO (без этого EXTI16 не заведется!)
+
+    // НАСТРОЙКА УРОВНЯ PVD (2.9V)
+    // Очищаем биты PLS и выставляем 2.9V (для STM32F103 это биты 111, то есть все три маски)
+    PWR->CR &= ~PWR_CR_PLS;
+    PWR->CR |= PWR_CR_PLS_2 | PWR_CR_PLS_1 | PWR_CR_PLS_0; // Уровень 2.9V (PLS = 111)
+
+    // Включаем сам детектор PVD
+    PWR->CR |= PWR_CR_PVDE;
+
+    // НАСТРОЙКА ЛИНИИ EXTI16 (PVD)
+    EXTI->IMR  |= EXTI_IMR_MR16;   // Разрешаем прерывание от линии 16
+    
+    // Включаем ОБА фронта (и на падение питания, и на его восстановление — для надежности)
+    EXTI->RTSR |= EXTI_RTSR_TR16;  // Rising trigger (сработает ТОЧНО в момент падения ниже 2.9V)
+    EXTI->FTSR |= EXTI_FTSR_TR16;  // Falling trigger
+    
+    EXTI->PR    = EXTI_PR_PR16;    // Сбрасываем флаг старых прерываний, если они были
+
+    // НАСТРОЙКА NVIC
+    NVIC_SetPriority(PVD_IRQn, 0); // Максимальный приоритет (0), чтобы DSP или таймеры не прервали запись!
+    NVIC_EnableIRQ(PVD_IRQn);      // Разрешаем прерывание в ядре
+}
+
 void GPIO_Init_Buttons(void) { // Инициализация кнопок
     // 1. Тактирование портов и альтернативных функций
     RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPBEN | RCC_APB2ENR_AFIOEN;
@@ -488,9 +524,18 @@ void DSP_init(void){  // Инициализация функций библиотеки DSP
 	coeff_hilbert_init();
 	arm_fir_init_q15(&f_hil, n_coeff_hil, coeff_hil_q15, pstate_hil, block_size_h); // Инициализация КИХ Гилберта
 	
-	// 3000.0f - частота среза в Гц
-	// 21875.0f - частота дискретизации (Sample Rate)
-	Calculate_lpf_Q31(3000.0f, 21875.0f); 
+
+	lpf_new = Calculate_lpf_Q31(bandwidth[mode], 21875.0f, &lpf_stages); // Установка полосы пропускания 
+
+	arm_biquad_cascade_df1_init_q31(&S_LPF, lpf_stages, lpf_coeffs_new, lpf_state, 1);
+	if (lpf_new)
+	{
+		memcpy(lpf_coeffs,
+					 lpf_coeffs_new,
+					 sizeof(lpf_coeffs));
+		memset(lpf_state, 0, sizeof(lpf_state));
+		lpf_new = 0;
+	}
 }
 
 void RX_Device_Inint(void){  // Инициализация ЦАП и АЦП на прием
@@ -585,20 +630,30 @@ void TX_Device_Inint(void){  // Инициализация ЦАП и АЦП на передачу
     ADC1->CR2 |= ADC_CR2_SWSTART; 
 	  TIM4->CR1 |= TIM_CR1_CEN;     // Стартуем преобразование гилберта и фнч
 }
-void Calculate_lpf_Q31(float cutOffFreq, float sampleRate) { // ситаем коэфициенты ФНЧ для БИХ
+
+// Баттерворта
+uint8_t Calculate_lpf_Q31(float cutOffFreq, float sampleRate, uint8_t *out_stages) { // считаем коэффициенты ФНЧ для БИХ
     float pi = 3.1415926535f;
     float fs = sampleRate;
     float fc = cutOffFreq;
-	
-    float n = (float)LPF_STAGES * 2.0f; // Порядок фильтра (16)
+    
+    // Автоматический выбор количества биквадов (stages) в зависимости от полосы
+    uint8_t stages = (fc <= 800.0f) ? 6 : 8; 
+    
+    // Записываем результат по указателю, если он передан
+    if (out_stages != NULL) {
+        *out_stages = stages;
+    }
+    
+    // Порядок фильтра (N) в два раза больше количества биквадов
+    float n = (float)stages * 2.0f; 
+    
     float omega = tanf(pi * fc / fs);
     float omega2 = omega * omega;
 
-    for (int i = 0; i < LPF_STAGES; i++) {
-        // Угол полюса для Баттерворта 16-го порядка
+    for (int i = 0; i < stages; i++) {
         float angle = pi * (2.0f * (float)i + 1.0f) / (2.0f * n);
-        float q = 1.0f / (2.0f * cosf(angle)); // Добротность секции
-
+        float q = 1.0f / (2.0f * cosf(angle));
         float delta = omega2 + omega / q + 1.0f;
         
         float b0 = omega2 / delta;
@@ -607,24 +662,16 @@ void Calculate_lpf_Q31(float cutOffFreq, float sampleRate) { // ситаем коэфициен
         float a1 = 2.0f * (omega2 - 1.0f) / delta;
         float a2 = (omega2 - omega / q + 1.0f) / delta;
 
-        // Запись в массив CMSIS (b0, b1, b2, a1, a2)
-        // Делим на 2 для postShift=1 (защита от переполнения)
-        lpf_coeffs[i * 5 + 0] = (q31_t)(b0 * 1073741824.0f); 
-        lpf_coeffs[i * 5 + 1] = (q31_t)(b1 * 1073741824.0f);
-        lpf_coeffs[i * 5 + 2] = (q31_t)(b2 * 1073741824.0f);
-        lpf_coeffs[i * 5 + 3] = (q31_t)(-a1 * 1073741824.0f); // Инверсия a1
-        lpf_coeffs[i * 5 + 4] = (q31_t)(-a2 * 1073741824.0f); // Инверсия a2
+        lpf_coeffs_new[i * 5 + 0] = (q31_t)(b0 * 1073741824.0f);
+        lpf_coeffs_new[i * 5 + 1] = (q31_t)(b1 * 1073741824.0f);
+        lpf_coeffs_new[i * 5 + 2] = (q31_t)(b2 * 1073741824.0f);
+        lpf_coeffs_new[i * 5 + 3] = (q31_t)(-a1 * 1073741824.0f);
+        lpf_coeffs_new[i * 5 + 4] = (q31_t)(-a2 * 1073741824.0f);
     }
-
-    // Очистка памяти фильтра
-    memset(lpf_state, 0, sizeof(lpf_state));
-		// LPF_STAGES - количество секций (биквадов)
-		// lpf_coeffs - массив из 5 коэффициентов
-		// lpf_state - массив из 4 состояний
-		// 1 - postShift (компенсирует деление коэффициентов на 2 для защиты от переполнения)
-    // Инициализация. postShift = 1 обязателен, так как коэффициенты делены на 2
-    arm_biquad_cascade_df1_init_q31(&S_LPF, LPF_STAGES, lpf_coeffs, lpf_state, 1);
+    
+    return 1; // Возвращаем 1 (поднимаем флаг готовности коэффициентов)
 }
+
 
 /*void calculate_lpf_coeffs_q15(q15_t *pCoeffs, float cutoff_freq) {
     const int N = 64;
@@ -665,8 +712,8 @@ void coeff_hilbert_init(void) {
     for (int16_t i = 1; i <= half; i++) {
         // 1. Расчет идеального коэффициента (только для нечетных i)
         if (i % 2 != 0) {
-            // Формула: 2 / (pi * i)*(уменьшение усиления)
-            out_coe = 2.0f / (3.1415926535f * (float32_t)i)* 0.92f;
+            // Формула: 2 / (pi * i)
+            out_coe = 2.0f / (3.1415926535f * (float32_t)i);
         } else {
             out_coe = 0.0f;
         }
@@ -770,25 +817,31 @@ void fast_hilbert_q15_custom(const arm_fir_instance_q15 *S, q15_t *pSrc, q15_t *
     memmove(pState, &pState[blockSize], (numTaps - 1) * sizeof(q15_t));
 }
 //////////// Проверяем энкодер. Делать в цикле.  1 если значение изменилось ////////////////////
-uint8_t Process_Encoder(uint32_t *frec, uint32_t step) {
-    static int16_t last_counter = 0;
-    int16_t current_counter = (int16_t)TIM1->CNT;
-    
-    // Делитель 4 для стандартных энкодеров с трещоткой (EC11)
-    int16_t delta = (current_counter - last_counter) / 4; 
+uint8_t Process_Encoder(int32_t *value, int32_t step, int32_t min_val, int32_t max_val) {
+    int16_t current_cnt = (int16_t)TIM1->CNT;
+    int16_t delta = current_cnt / 4; 
 
-    if (delta == 0) return 0; // Изменений нет
+    if (delta == 0) return 0; 
 
-    int64_t temp_frec = (int64_t)*frec + (delta * (int64_t)step);
+    // Защита: если на входе в функцию прилетел полный бред (например, указатель прочитал 0 
+    // или отрицательное число из-за неинициализированной структуры trx_state)
+    if (*value < min_val || *value > max_val) {
+        // Если значение вылетает за рамки еще ДО поворота, значит, 
+        // Не даем упасть в 0, а принудительно ставим среднее значение для теста
+        *value = (max_val + min_val) / 2; 
+        TIM1->CNT = (uint32_t)(current_cnt - (delta * 4));
+        return 1;
+    }
 
-    // Ограничители
-    if (temp_frec < 0) temp_frec = 0;
-    if (temp_frec > 120000000) temp_frec = 120000000;
+    int32_t temp = *value + (delta * step);
 
-    *frec = (uint32_t)temp_frec;
-    last_counter += (delta * 4); // Синхронизируем счетчик
+    if (temp < min_val) temp = min_val;
+    if (temp > max_val) temp = max_val;
 
-    return 1; // Частота изменилась
+    *value = temp;
+    TIM1->CNT = (uint32_t)(current_cnt - (delta * 4)); 
+
+    return 1; 
 }
 
 void si5351_SetFrec(uint32_t frec){
@@ -842,43 +895,47 @@ void si5351_SetFrec(uint32_t frec){
 	//si5351_EnableOutputs((1 << 2) | (1 << 0));
 }
 
-void Main_Scren_Init(void){         // Инициализация основного экрана
-	a_b_frec=0;
-	ILI9341_Fill_Screen(MYFON);       // заливка всего экрана цветом (цвета в файле ILI9341_GFX.h)
-	Draw_Step(step);                  // Рисуем плашки под основной частотой
-	ILI9341_Draw_Scale();             // Шкала водопада
-  Draw_SMeter_Labels(40, 11);
-	if (!rx_tx_fl) {                  // RX/TX
-	  ILI9341_WriteString( 46, 108, "R", Font_16x26, GREEN, MYFON); // RX/TX
+void Set_mode(){               // Установка режима модуляции из trx_state
+  if(trx_state.active_vfo==0){ // Если VFO A
+		mode = trx_state.band_mode_a[trx_state.current_band];
 	}
-	else {
-		ILI9341_WriteString( 46, 108, "T", Font_16x26, GREEN, MYFON); // RX/TX
+  if(trx_state.active_vfo==1){ // Если VFO B
+		mode = trx_state.band_mode_b[trx_state.current_band];
 	}
-	Refreash_Band();  // Обновляем диапазон
-  Refreash_A_B(); // Обновляем A/B VFO ------------
-	ILI9341_WriteString( 46, 118+26,    "   SDR ON", Font_16x26, WHITE, MYFON); // RX/TX
-	ILI9341_WriteString( 46+8, 118+26+26, " BLUE PILL", Font_16x26, WHITE, MYFON); // RX/TX
+	lpf_new = Calculate_lpf_Q31(bandwidth[mode], 21875.0f, &lpf_stages); // Установка полосы пропускания
 }
 
-void Refreash_A_B(void){           // Перерисовываем A/B VFO
+void Main_Scren_Init(void){         // Инициализация основного экрана
+	//trx_state.active_vfo=0;
+	ILI9341_Fill_Screen(MYFON);       // заливка всего экрана цветом (цвета в файле ILI9341_GFX.h)
+	
+	ILI9341_Draw_Scale();             // Шкала водопада
+  Draw_SMeter_Labels(40, 11);
+  Redraw_Main_Scr();                // Основной экран
+	//ILI9341_WriteString( 46, 118+26,    "   SDR ON", Font_16x26, WHITE, MYFON); // RX/TX
+	//ILI9341_WriteString( 46+8, 118+26+26, " BLUE PILL", Font_16x26, WHITE, MYFON); // RX/TX
+}
+
+void Redraw_A_B(void){             // Перерисовываем A/B VFO
 	memset(old_txt_freq, 0, 12);     // обнуляем текстовый буфер вывода частоты
-	if (!a_b_frec) {                 // A/B
+	if (!trx_state.active_vfo) {                 // A/B
 	  ILI9341_WriteString( 46, 108-26, "VFO B", Font_11x18, GREEN, MYFON); // vfo a/vfo b
-		ILI9341_Draw_Frec11x18(46 + 84, 108-26, bands_frec_b[band_idx]);
-		ILI9341_Draw_MainFrec(78, 108, bands_frec_a[band_idx]); // выводим основную частоу
-		si5351_SetFrec(bands_frec_a[band_idx]<<2);
+		ILI9341_Draw_Frec11x18(46 + 84, 108-26, trx_state.vfo_b_freq[trx_state.current_band]);
+		ILI9341_Draw_MainFrec(78, 108, trx_state.vfo_a_freq[trx_state.current_band]); // выводим основную частоу
+		si5351_SetFrec(trx_state.vfo_a_freq[trx_state.current_band]<<2);
 	}
 	else {
 		ILI9341_WriteString( 46, 108-26, "VFO A", Font_11x18, GREEN, MYFON); // vfo a/vfo b
-		ILI9341_Draw_Frec11x18(46 + 84, 108-26, bands_frec_a[band_idx]);
-		ILI9341_Draw_MainFrec(78, 108, bands_frec_b[band_idx]); // выводим основную частоу
-		si5351_SetFrec(bands_frec_b[band_idx]<<2);
+		ILI9341_Draw_Frec11x18(46 + 84, 108-26, trx_state.vfo_a_freq[trx_state.current_band]);
+		ILI9341_Draw_MainFrec(78, 108, trx_state.vfo_b_freq[trx_state.current_band]); // выводим основную частоу
+		si5351_SetFrec(trx_state.vfo_b_freq[trx_state.current_band]<<2);
 	}/**/
+	Redraw_Step(trx_state.tuning_step, 0);        // Рисуем плашки шага под основной частотой
 }
 
-void Refreash_Band(void){     // Обновляем диапазон
+void Redraw_Band(void){     // Обновляем диапазон
 	ILI9341_WriteString( 46, 0, "Band - ", Font_11x18, GREEN, MYFON); // Диапазон
-	switch (band_idx) {
+	switch (trx_state.current_band) {
 		case 0x00: // 160m
 		  ILI9341_WriteString( 46+77, 0, "160m", Font_11x18, GREEN, MYFON); //
 		  break;
@@ -907,4 +964,82 @@ void Refreash_Band(void){     // Обновляем диапазон
 		  ILI9341_WriteString( 46+77, 0, "10m", Font_11x18, GREEN, MYFON); // 
 		  break;
 	}
+}
+
+void Redraw_mode(void){  // Перерисовываем модуляцию
+	ILI9341_WriteString( 46, 108 + 26, "Mode - ", Font_11x18, GREEN, MYFON);
+	switch (mode) {
+		case 0x00: // CW
+		  ILI9341_WriteString( 46+11*7, 108 + 26, " CW", Font_11x18, GREEN, MYFON); //
+		  break;
+		case 0x01: // LSB
+		  ILI9341_WriteString( 46+11*7, 108 + 26, "LSB", Font_11x18, GREEN, MYFON); //
+		  break;
+		case 0x02: // USB
+		  ILI9341_WriteString( 46+11*7, 108 + 26, "USB", Font_11x18, GREEN, MYFON); //
+		  break;
+		case 0x03: // AM
+		  ILI9341_WriteString( 46+11*7, 108 + 26, " AM", Font_11x18, GREEN, MYFON); //
+		  break;
+		case 0x04: // FM
+		  ILI9341_WriteString( 46+11*7, 108 + 26, " FM", Font_11x18, GREEN, MYFON); //
+		  break;
+	}
+}
+
+void Redraw_volume(void){  // Перерисовываем громкость
+	ILI9341_Draw_Menu_Var( 46+11*9, 108 + 26 + 18, trx_state.volume);
+	if (trx_state_flag.volume_enabled){           // Если регулируем громкость
+	  ILI9341_WriteString( 46, 108 + 26 + 18, "Volume - ", Font_11x18, GREEN, MYFON);
+	}
+	else{
+		ILI9341_WriteString( 46, 108 + 26 + 18, "Volume - ", Font_11x18, BORDERCL, MYFON);
+	}
+}
+
+void Redraw_Main_Scr(void){  // Перерисовываем главный экран
+	// Отрисовка основного экрана
+	ILI9341_Draw_Rectangle(46, 0, 243-46, 240, MYFON);
+	if (!rx_tx_fl) {                   // RX/TX
+		ILI9341_WriteString( 46, 108, "R", Font_16x26, GREEN, MYFON); // RX/TX
+	}
+	else {
+		ILI9341_WriteString( 46, 108, "T", Font_16x26, GREEN, MYFON); // RX/TX
+	}
+	Redraw_Band();    // Обновляем диапазон
+	Redraw_A_B();     // Обновляем A/B VFO
+	Redraw_mode();    // Перерисовываем модуляцию
+	Redraw_volume();  // Перерисовываем громкость
+}
+
+void Redraw_Step(uint16_t step, uint8_t m_fl){ // Рисуем плашки под основной частотой
+	if(!m_fl){ // Если не в меню
+		ILI9341_Draw_Rectangle(63+16*5, 108+26, 16*6, 2, MYFON);
+		switch (step) {
+			case 1: 
+				// 
+				ILI9341_Draw_Rectangle(63+16*10, 108+26, 16, 2, GREEN);
+				break;
+			case 10: 
+				// 
+				ILI9341_Draw_Rectangle(63+16*9, 108+26, 16, 2, GREEN);
+				break;
+			case 100: 
+				//
+				ILI9341_Draw_Rectangle(63+16*8, 108+26, 16, 2, GREEN);
+				break;
+			case 1000: 
+				// 
+				ILI9341_Draw_Rectangle(63+16*6, 108+26, 16, 2, GREEN);
+				break;
+			case 10000: 
+				// 
+				ILI9341_Draw_Rectangle(63+16*5, 108+26, 16, 2, GREEN);
+				break;
+		}
+	}
+	else {
+		ILI9341_WriteString(   46, 240-18, "Step -", Font_11x18, GREEN, MYFON);
+		ILI9341_Draw_Menu_Var(152, 240-18, step);
+	}	
 }

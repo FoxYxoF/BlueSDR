@@ -11,21 +11,23 @@ uint16_t out_mag_fft[256];                   // Выход с реальными уровнями
 uint16_t s_metr = 100;
 
 extern uint32_t   main_frec;
-extern uint16_t   step;                      // Шаг перестройки
-extern int16_t    cal_si;                    // Калибровка si
-extern bool       fft_arr_fl;                // Флаг заполнения массива	
-extern bool       menu_fl;                   // Флаг фхода в меню
-extern bool       sub_menu_fl;               // Флаг фхода в подменю
+extern uint16_t   step;                        // Шаг перестройки
+extern int16_t    cal_si;                      // Калибровка si
+extern bool       fft_arr_fl;                  // Флаг заполнения массива	
+extern bool       menu_fl;                     // Флаг фхода в меню
+extern bool       sub_menu_fl;                 // Флаг фхода в подменю
 // Инициализация переменных навигации (начинаем с Главного меню, 0-й строки)
 extern uint8_t current_menu;
 extern uint8_t current_submenu;
-extern bool       a_b_frec;                  // частота A(0), B(1)
-extern uint8_t    band_idx;                  // Текущий диапазон
-extern uint32_t   bands_frec_a[];            // Диапазоны частота
-extern uint32_t   bands_frec_b[];            // Диапазоны частота
+//extern bool       a_b_frec;                  // частота A(0), B(1)
+//extern uint8_t    band_idx;                  // Текущий диапазон
+//extern uint32_t   bands_frec_a[];            // Диапазоны частота
+//extern uint32_t   bands_frec_b[];            // Диапазоны частота
+extern trx_state_t trx_state;                  // Текущее состояние трансивера
+extern trx_state_f trx_state_flag;             // Флаги состояния трансивера
 
-extern q15_t s_peak;                         // Значения для с-метра
-extern uint8_t code_button;
+extern q15_t s_peak;                           // Значения для с-метра
+extern uint8_t code_button; 
 extern char txt_butt[32];
 extern bool rx_tx_fl;
 
@@ -51,6 +53,25 @@ const q15_t hamming_window_256[256] = {
     3175, 3066, 2963, 2868, 2781, 2700, 2627, 2561, 2504, 2454, 2410, 2376, 2348, 2329, 2317, 2313
 };
 
+const uint16_t cic3_comp_256[256] = {
+    256, 256, 256, 256, 256, 256, 257, 257, 257, 258, 258, 258, 259, 259, 260, 260,
+    261, 262, 262, 263, 264, 265, 265, 266, 267, 268, 269, 270, 271, 273, 274, 275,
+    276, 278, 279, 280, 282, 284, 285, 287, 289, 290, 292, 294, 296, 298, 300, 302,
+    304, 307, 309, 311, 314, 316, 319, 321, 324, 327, 330, 333, 336, 339, 342, 346,
+    349, 353, 356, 360, 364, 368, 372, 376, 380, 384, 389, 393, 398, 403, 408, 413,
+    418, 424, 429, 435, 441, 447, 453, 459, 466, 472, 479, 486, 494, 501, 509, 517,
+    525, 533, 542, 551, 560, 570, 579, 589, 600, 610, 621, 632, 644, 656, 668, 681,
+    694, 708, 722, 736, 751, 766, 768, 768, 768, 768, 768, 768, 768, 768, 768, 768,
+    768, 768, 768, 768, 768, 768, 768, 768, 768, 768, 768, 768, 766, 751, 736, 722,
+    708, 694, 681, 668, 656, 644, 632, 621, 610, 600, 589, 579, 570, 560, 550, 542,
+    533, 525, 517, 509, 501, 494, 486, 479, 472, 466, 459, 453, 447, 441, 435, 429,
+    424, 418, 413, 408, 403, 398, 393, 389, 384, 380, 376, 372, 368, 364, 360, 356,
+    353, 349, 346, 342, 339, 336, 333, 330, 327, 324, 321, 319, 316, 314, 311, 309,
+    307, 304, 302, 300, 298, 296, 294, 292, 290, 289, 287, 285, 284, 282, 280, 279,
+    278, 276, 275, 274, 273, 271, 270, 269, 268, 267, 266, 265, 265, 264, 263, 262,
+    262, 261, 260, 260, 259, 259, 258, 258, 258, 257, 257, 257, 256, 256, 256, 256
+};
+
 // Функция перевода амплитуды Q15 в значение для пикселя водопада (0-255)
 uint8_t magnitude_to_db_pixel(q15_t mag) {
     if (mag <= 0) return 0;
@@ -71,30 +92,33 @@ uint8_t magnitude_to_db_pixel(q15_t mag) {
 
 int main(void) {
 	
-	SysTick_Setup();  // Настройка системного таймера
-  GPIO_Init();   	  // инициализация портов ввода вывода
- 	
-	SPI2_init();      // инициализация SPI
-  PWM2_Init();      // Инициализация шим
-  PWM3_Init();      // Инициализация шим
-	TIM4_Init();      // инициализация таймера 4 для массивов преобразования Гилберта и ФНЧ
+	SysTick_Setup();               // Настройка системного таймера
+  GPIO_Init();   	               // инициализация портов ввода вывода
+	
+ 	TRX_State_Load();              // Загрузка из флеш последнего состояния
+	
+	SPI2_init();                   // инициализация SPI
+  PWM2_Init();                   // Инициализация шим
+  PWM3_Init();                   // Инициализация шим
+	TIM4_Init();                   // инициализация таймера 4 для массивов преобразования Гилберта и ФНЧ
 	ADC_DMA_Init();
-	
-  I2C1_Init();         // Инициализация I2C1
+ 
+  I2C1_Init();                   // Инициализация I2C1
+
+
 	si5351_Init(cal_si);
-  si5351_SetFrec(main_frec<<2); // Запустили текущую частоту
-
-	TIM1_Encoder_Init(); // Инициализация энкодера
-	GPIO_Init_Buttons(); // Инициализация кнопок
+	si5351_SetFrec(trx_state.vfo_a_freq[trx_state.current_band]<<2);// Запустили текущую частоту
+  Set_mode();                    // Установка режима модуляции из trx_state
+	DSP_init();                    // Инициализация DSP
+	arm_cfft_init_256_q15(&cfft);  // БПФ для водопада	
 	
-	DSP_init();
-
-	ADC2->CR2 |= ADC_CR2_SWSTART;	// Стартуем ацп
-	ADC1->CR2 |= ADC_CR2_SWSTART; //	
-	TIM4->CR1 |= TIM_CR1_CEN;     // Стартуем преобразование гилберта и фнч
-
+	ADC2->CR2 |= ADC_CR2_SWSTART;	 // Стартуем ацп
+	ADC1->CR2 |= ADC_CR2_SWSTART;  //	
+	TIM4->CR1 |= TIM_CR1_CEN;      // Стартуем преобразование гилберта и фнч	
 	
-	arm_cfft_init_256_q15(&cfft); // БПФ для водопада
+	TIM1_Encoder_Init();           // Инициализация энкодера
+	GPIO_Init_Buttons();           // Инициализация кнопок	
+
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	ILI9341_Init(); // инициализация дисплея
 	//ILI9341_Set_Rotation(SCREEN_HORIZONTAL_2); // установка ориентации экрана (варианты в файле ILI9341_GFX.h) для ILI9341
@@ -109,7 +133,7 @@ int main(void) {
 				ILI9341_WriteString( 46, 108, "T", Font_16x26, GREEN, MYFON); // RX/TX
 				TX_Device_Inint();
 			}	/**/
-			
+	PWR_Init();          // Инициализация контроля питания	
 	while(1) {		
 	  if (fft_arr_fl) // если массив для бпф заполнен делаем преобразование и выводим
 	  {
@@ -120,7 +144,7 @@ int main(void) {
       }
 			
 			arm_cfft_q15(&cfft, complex_in_fft, 0, 1);
-			//arm_cmplx_mag_q15(complex_in_fft, out_mag_fft, 256);  
+			//arm_cmplx_mag_q31(complex_in_fft, out_mag_fft, 256);  
 
 			for (int j = 0; j < 256; j++) {
 					// Извлекаем Real и Imaginary компоненты
@@ -131,21 +155,20 @@ int main(void) {
 					if (re < 0) re = -re;
 					if (im < 0) im = -im;
 					
-					// 3. Линейное приближение вектора (метод Alpha-Beta)
+					// Линейное приближение вектора (метод Alpha-Beta)
 					int32_t max_val = (re > im) ? re : im;
 					int32_t min_val = (re > im) ? im : re;
 					int32_t mag = max_val + ((min_val * 3) >>3); // Результат лежит в диапазоне 0...32767
-					
-					// Математически точное округление до 8 бит (0...255)
-					// Прибавляем половину младшего бита (+64 для сдвига на 7) перед делением,
-					// чтобы значения округлялись к ближайшему целому, а не просто срезались.
-					int32_t color_val = (mag); 
-					
-					// 5. Ограничение под палитру (clipping)
-					if (color_val > 255) color_val = 255;
-					
+				
+					// === Цифровая компенсация завала CIC-фильтра ===
+					// Умножаем на q8 коэффициент и сдвигаем на 8 бит. 
+					// Так как макс. mag = 32767, а макс. коэф = 768, промежуточное произведение 
+					// уложится в ~25 000 000, что идеально заходит в рамки signed int32_t.
+					mag = (mag * cic3_comp_256[j]) >> 8;					
+					// Ограничение под палитру (clipping)
+					if (mag > 255) mag = 255;	
 					// Записываем чистые 256 градаций
-					out_mag_fft[j] = (q15_t)color_val;
+					out_mag_fft[j] = (q15_t)mag;
 			}/**/
 
 			ILI9341_Draw_Waterfall(out_mag_fft); // выводим строку водопада
@@ -160,24 +183,32 @@ int main(void) {
 			s_peak = 0;
 			
 				if(!menu_fl){ // Если не в меню
-					if (!a_b_frec) {      						// A/B
-						if (Process_Encoder(&bands_frec_a[band_idx], step)) { // Если частота изменилась
+					if (trx_state_flag.volume_enabled){           // Если регулируем громкость
+						int32_t tmp = trx_state.volume;
+						if (Process_Encoder(&tmp, 1, 0, 100)){ // Если энкодер крутили
+							trx_state.volume = tmp;
+							ILI9341_Draw_Menu_Var( 46+11*9, 108 + 26 + 18, trx_state.volume);
+						}
+					} else
+					if (!trx_state.active_vfo) {      						// VFO A
+						if (Process_Encoder(&trx_state.vfo_a_freq[trx_state.current_band], trx_state.tuning_step, 0, 30000000)) { // Если частота изменилась
 							// Этот блок выполнится только при повороте ручки
-							ILI9341_Draw_MainFrec(78, 108, bands_frec_a[band_idx]);
-							si5351_SetFrec(bands_frec_a[band_idx]<<2);
+							ILI9341_Draw_MainFrec(78, 108, trx_state.vfo_a_freq[trx_state.current_band]);
+							si5351_SetFrec(trx_state.vfo_a_freq[trx_state.current_band]<<2);
 						}
 					}
-					else {
-						if (Process_Encoder(&bands_frec_b[band_idx], step)) { // Если частота изменилась
+					else {     	                                   // VFO B
+						if (Process_Encoder(&trx_state.vfo_b_freq[trx_state.current_band], trx_state.tuning_step, 0, 30000000)) { // Если частота изменилась
 							// Этот блок выполнится только при повороте ручки
-							ILI9341_Draw_MainFrec(78, 108, bands_frec_b[band_idx]);
-							si5351_SetFrec(bands_frec_b[band_idx]<<2);
+							ILI9341_Draw_MainFrec(78, 108, trx_state.vfo_b_freq[trx_state.current_band]);
+							si5351_SetFrec(trx_state.vfo_b_freq[trx_state.current_band]<<2);
 						}
 					}
 				}
 				else{ // Если в основном меню
 					if(sub_menu_fl){ // Если в подменю
 						//DrawVarMenu(current_menu, current_submenu);
+						Menu_Enc(current_menu, current_submenu);
 					}	
 				}
 			
