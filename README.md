@@ -72,7 +72,7 @@ Precompiled firmware binaries:
 
 | Version | Release Date | Download Link | Status |
 | :--- | :--- | :--- | :--- |
-| **v0.2** | 28.07.2026 | [`BlueSDR_v0.2_28072026.hex`](Firmware/BlueSDR_v0.2_28072026.hex) | **Latest (Stable)** |
+| **v0.2** | 28.07.2026 | [`BlueSDR_v0.2_28072026.hex`](Firmware/BlueSDR_v0.2_28072026.hex) | **Latest** |
 | **v0.1** | 04.07.2026 | [`BlueSDR_v0.1_04072026.hex`](Firmware/BlueSDR_v0.1_04072026.hex) | Outdated Prototype |
 
 
