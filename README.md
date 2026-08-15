@@ -1,63 +1,63 @@
 # BlueSDR
 
-**STM32F103C8T6 Software Defined Radio (SDR) Transceiver — v0.2**
+**Программно-определяемый трансивер (SDR) на базе STM32F103C8T6 — v0.2**
 
-Hybrid SDR system with real-time DSP processing, analog RF frontend, and TFT spectrum display.
-
----
-
-## 📡 Overview
-
-BlueSDR is an experimental software-defined radio transceiver based on STM32F103 (Blue Pill) and SI5351 clock generator.
-
-The system combines real-time digital signal processing with an analog RF/baseband frontend, PWM-based DAC output, and a TFT spectrum display.
+Гибридная SDR-система DSP обработкой в реальном времени, аналоговым ВЧ-трактом (RF frontend) и TFT-дисплеем спектра.
 
 ---
 
-## 🧠 System Architecture
+## 📡 Общее описание
+
+BlueSDR — это экспериментальный SDR радиотрансивер, построенный на микроконтроллере STM32F103 (Blue Pill) и генераторе тактовых частот SI5351.
+
+Система сочетает в себе цифровую обработку сигналов в реальном времени с аналоговым ВЧ/НЧ-трактом, ШИМ-выходом ЦАП и графическим TFT-индикатором спектра.
+
+---
+
+## 🧠 Архитектура системы
 
 ![DSP Architecture](images/BlueSDR_DSP_Architecture.png)
 
-The system is built around a hybrid DSP pipeline:
+В основе системы лежит гибридный конвейер ЦОС (DSP):
 
-- ADC input (baseband / I-Q signals)
-- Digital filtering (IIR / FIR stages)
-- Hilbert transform (phase shifting)
-- AGC / dynamic gain control
-- FFT spectrum analysis
-- PWM DAC output stage (10-bit effective resolution)
+- Вход АЦП (сигналы базовой полосы / I-Q компоненты)
+- Цифровая фильтрация (каскады БИХ / КИХ фильтров)
+- Преобразование Гильберта (фазовый сдвиг)
+- АРУ / динамическое управление усилением
+- БПФ (FFT) анализ спектра
+- Выходной каскад ШИМ ЦАП (эффективное разрешение 10 бит)
 
 ---
 
-## 📻 RF Frontend
+## 📻 ВЧ-тракт (RF Frontend)
 
 ![RF Modem](images/RF_Modem_Schematic.png)
 
-Analog subsystem includes:
+Аналоговая подсистема включает в себя:
 
-- RF mixing stage
-- Op-amp based filtering
-- Baseband conditioning
-- TX/RX switching
-- Audio interface (microphone / speaker path)
+- Каскад ВЧ-смесителя
+- Фильтрацию на операционных усилителях
+- Формирование сигналов базовой полосы (baseband)
+- Переключение прием/передача (TX/RX)
+- Аудиоинтерфейс (тракт микрофона / динамика)
 
 ---
 
-## 🖥️ System Integration
+## 🖥️ Системная интеграция
 
 ![System Overview](images/System_Interconnection.png)
 
-Main system components:
+Основные компоненты системы:
 
-- STM32F103 microcontroller  
-- SI5351 clock generator  
-- Analog RF/baseband frontend  
-- TFT spectrum display  
-- Encoder and button interface  
+- Микроконтроллер STM32F103  
+- Генератор тактовых частот SI5351  
+- Аналоговый ВЧ/НЧ-тракт (RF/baseband)  
+- TFT-дисплей спектра  
+- Интерфейс энкодера и кнопок  
 
 ---
 
-## 📷 Hardware Prototype
+## 📷 Прототип устройства
 
 ![Photo 1](images/photo1.jpg)
 
@@ -65,69 +65,67 @@ Main system components:
 
 ---
 
-## ⚙️ Firmware
+## ⚙️ Прошивка
 
-Precompiled firmware binaries:
+Скомпилированные бинарные файлы прошивок:
 
-
-| Version | Release Date | Download Link | Status |
+| Версия | Дата релиза | Ссылка на скачивание | Статус |
 | :--- | :--- | :--- | :--- |
-| **v0.2** | 28.07.2026 | [`BlueSDR_v0.2_28072026.hex`](Firmware/BlueSDR_v0.2_28072026.hex) | **Latest** |
-| **v0.1** | 04.07.2026 | [`BlueSDR_v0.1_04072026.hex`](Firmware/BlueSDR_v0.1_04072026.hex) | Outdated Prototype |
+| **v0.2** | 28.07.2026 | [`BlueSDR_v0.2_28072026.hex`](Firmware/BlueSDR_v0.2_28072026.hex) | **Актуальная** |
+| **v0.1** | 04.07.2026 | [`BlueSDR_v0.1_04072026.hex`](Firmware/BlueSDR_v0.1_04072026.hex) | Устаревший прототип |
 
+### Прошивка микроконтроллера
 
-### Flashing
-
-Use one of the following tools:
+Используйте любой из следующих инструментов:
 
 - STM32CubeProgrammer
 - ST-Link Utility
 - OpenOCD
 
-Target MCU:
+Целевой МК:
 STM32F103C8T6 (Blue Pill)
 
 ---
 
-## 📊 Features & Changelog (v0.2)
+## 📊 Возможности и список изменений (v0.2)
 
-### Receiver & DSP
-- **SI5351 Calibration:** Added precise clock generator calibration.
-- **I-Q Channel Tuning:** Phase and balance adjustment for mirror channel rejection.
-- **Advanced AGC:** Dynamic gain control with adjustable Attack, Release, and Threshold.
-- **Modulation Modes:** Quick switching between modes, including newly added **AM modulation**.
-- **Bandwidth Control:** Independent bandwidth adjustment for each modulation type.
-- **Visuals:** Real-time FFT spectrum and waterfall display with active bandwidth visualization.
-- **Audio:** Smooth volume regulation.
+### Приемник и DSP
+- **Калибровка SI5351:** Добавлена точная калибровка тактового генератора.
+- **Настройка I-Q каналов:** Регулировка фазы и баланса для подавления зеркального канала.
+- **Продвинутая АРУ:** Динамическое управление усилением с настраиваемыми параметрами атаки (Attack), восстановления (Release) и порога (Threshold).
+- **Режимы модуляции:** Быстрое переключение режимов, включая вновь добавленную **AM-модуляцию**.
+- **Управление полосой пропускания:** Независимая регулировка полосы пропускания для каждого типа модуляции.
+- **Визуализация:** БПФ-спектр (FFT) и «водопад» в реальном времени с отображением активной полосы пропускания.
+- **Аудио:** Плавная регулировка громкости.
 
-### Transmitter
-- Baseband processing.
-- Microphone compressor with full dynamic control (Attack, Release, Threshold).
-- PWM DAC output.
+### Передатчик
+- Обработка сигналов базовой полосы.
+- Компрессор микрофона с полным динамическим контролем (Атака, Восстановление, Порог).
+- Выход ШИМ ЦАП.
 
-### User Interface & System
-- TFT SPI display with waterfall.
-- Rotary encoder tuning and step selection.
-- **State Saving:** Non-volatile memory storage for transceiver state (Bandwidth, Modulation, Band, VFO, Volume, and Tuning Step).
-
----
-
-## 📌 Notes
-
-- Experimental SDR platform
-- Real-time fixed-point DSP (Q15/Q31)
-- Hybrid analog + digital architecture
-- Current version: v0.2 stable prototype
+### Пользовательский интерфейс и система
+- TFT SPI дисплей с поддержкой «водопада».
+- Настройка частоты и выбор шага с помощью поворотного энкодера.
+- **Сохранение состояния:** Хранение параметров трансивера в энергонезависимой памяти (полоса пропускания, модуляция, диапазон, VFO, громкость и шаг перестройки).
 
 ---
 
-## 🔗 Links
+## 📌 Примечания
+
+- Экспериментальная SDR-платформа
+- ЦОС реального времени с фиксированной точкой (Q15/Q31)
+- Гибридная аналогово-цифровая архитектура
+- Текущая версия: v0.2 стабильный прототип
+
+---
+
+## 🔗 Ссылки
 
 GitHub: https://github.com/FoxYxoF/BlueSDR  
 YouTube: https://www.youtube.com/@diyelectronics2595  
 
 ---
 
-## 📜 License
+## 📜 Лицензия
 
-Experimental / non-commercial prototype
+Экспериментальный / некоммерческий прототип
