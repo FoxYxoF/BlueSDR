@@ -32,28 +32,10 @@ char old_txt_freq[12] = {0};     // Для ILI9341_Draw_MainFrec храним т
 uint16_t smeter_min_db = 60;  // Порог шума (подбирается руками в меню или коде) "S-Meter Noise Floor"
 uint16_t smeter_scale  = 359; // Будет рассчитан автоматически (Q8)
 
-extern uint8_t	  mode;                       // Модуляция  (0:SW 1:LSB 2:USB 3:AM 4:FM)
-extern uint16_t   bandwidth[];                 // Полосы фильтра зч под индексы модуляции 
+extern uint8_t	  mode;                        // Модуляция  (0:SW 1:LSB 2:USB 3:AM 4:FM)
+extern uint16_t   bandwidth_rx[];                 // Полосы фильтра зч под индексы модуляции 
          
 
-static const uint16_t waterfall_palette_rainbow[256] = {
-    0x0000, 0x0002, 0x0004, 0x0006, 0x0009, 0x000B, 0x000D, 0x000F, 0x0011, 0x0014, 0x0016, 0x0018, 0x001A, 0x001D, 0x001F, 0x00BF,
-    0x015F, 0x01FF, 0x029F, 0x033F, 0x03DF, 0x047F, 0x051F, 0x05BF, 0x065F, 0x06FF, 0x079F, 0x083F, 0x08DF, 0x097F, 0x0A1F, 0x0ABF,
-    0x0B5F, 0x0BFF, 0x0C9F, 0x0D3F, 0x0DDF, 0x0E7F, 0x0F1F, 0x0FBF, 0x105F, 0x10FF, 0x119F, 0x123F, 0x12DF, 0x137F, 0x141F, 0x14BF,
-    0x153F, 0x15DF, 0x167F, 0x171F, 0x17BF, 0x17FE, 0x17FC, 0x17F9, 0x17F7, 0x17F5, 0x17F2, 0x17F0, 0x17EE, 0x17EB, 0x17E9, 0x17E7,
-    0x17E4, 0x17E2, 0x17E0, 0x1FE0, 0x27E0, 0x2FE0, 0x37E0, 0x3FE0, 0x47E0, 0x4FE0, 0x57E0, 0x5FE0, 0x67E0, 0x6FE0, 0x77E0, 0x7FE0,
-    0x87E0, 0x8FE0, 0x97E0, 0x9FE0, 0xA7E0, 0xAFE0, 0xB7E0, 0xBFE0, 0xC7E0, 0xCFE0, 0xD7E0, 0xDFE0, 0xE7E0, 0xEFE0, 0xF7E0, 0xFFE0,
-    0xFFC0, 0xFFA0, 0xFF80, 0xFF50, 0xFF30, 0xFF10, 0xFEE0, 0xFEC0, 0xFEA0, 0xFE70, 0xFE50, 0xFE30, 0xFE00, 0xFDE0, 0xFDC0, 0xFD90,
-    0xFD70, 0xFD50, 0xFD20, 0xFD00, 0xFCE0, 0xFCB0, 0xFC90, 0xFC70, 0xFC40, 0xFC20, 0xFC00, 0xFBE0, 0xFBC0, 0xFB90, 0xFB70, 0xFB50,
-    0xFB20, 0xFB00, 0xFAE0, 0xFAB0, 0xFA90, 0xFA70, 0xFA40, 0xFA20, 0xFA00, 0xF9E0, 0xF9C0, 0xF990, 0xF970, 0xF950, 0xF920, 0xF900,
-    0xF8E0, 0xF8B0, 0xF890, 0xF870, 0xF840, 0xF820, 0xF800, 0xF802, 0xF804, 0xF806, 0xF809, 0xF80B, 0xF80D, 0xF80F, 0xF811, 0xF814,
-    0xF816, 0xF818, 0xF81A, 0xF81D, 0xF81F, 0xF83F, 0xF85F, 0xF87F, 0xF89F, 0xF8BF, 0xF8DF, 0xF8FF, 0xF91F, 0xF93F, 0xF95F, 0xF97F,
-    0xF99F, 0xF9BF, 0xF9DF, 0xF9FF, 0xFA1F, 0xFA3F, 0xFA5F, 0xFA7F, 0xFA9F, 0xFABF, 0xFADF, 0xFAFF, 0xFB1F, 0xFB3F, 0xFB5F, 0xFB7F,
-    0xFB9F, 0xFBBF, 0xFBDF, 0xFBFF, 0xFC1F, 0xFC3F, 0xFC5F, 0xFC7F, 0xFC9F, 0xFCBF, 0xFCDF, 0xFCFF, 0xFD1F, 0xFD3F, 0xFD5F, 0xFD7F,
-    0xFD9F, 0xFDBF, 0xFDDF, 0xFDFF, 0xFE1F, 0xFE3F, 0xFE5F, 0xFE7F, 0xFE9F, 0xFEBF, 0xFEDF, 0xFEFF, 0xFF1F, 0xFF3F, 0xFF5F, 0xFF7F,
-    0xFF9F, 0xFFBF, 0xFFDF, 0xFFFF, 0xFFFE, 0xFFFC, 0xFFF9, 0xFFF7, 0xFFF5, 0xFFF2, 0xFFF0, 0xFFEE, 0xFFEB, 0xFFE9, 0xFFE7, 0xFFE4,
-    0xFFE2, 0xFFE0, 0xFFDE, 0xFFDB, 0xFFD9, 0xFFD7, 0xFFD4, 0xFFD2, 0xFFD0, 0xFFCE, 0xFFCB, 0xFFC9, 0xFFC7, 0xFFC4, 0xFFC2, 0xFFC0
-};
 
 static const uint16_t waterfall_palette_lava[256] = {
     0x0000, 0x0001, 0x0001, 0x0002, 0x0002, 0x0003, 0x0003, 0x0004,
@@ -604,7 +586,7 @@ void ILI9341_Draw_Waterfall(uint16_t* data) {
     apply_smoothing(data); // усредняем водопад
     
     // 1. Переводим Гц полосы в пиксели
-    uint16_t band_hz = bandwidth[mode]; 
+    uint16_t band_hz = bandwidth_rx[mode]; 
     uint16_t band_pixels = band_hz / (42682 >> 8); 
     
     // 2. Инициализируем границы по умолчанию (Для SW, AM, FM — это полуполоса ФНЧ, раскрывается в обе стороны)
@@ -650,23 +632,94 @@ void ILI9341_Draw_Waterfall(uint16_t* data) {
     buf_disp[254] = 0x07; buf_disp[255] = 0xE0; 
     buf_disp[256] = 0x07; buf_disp[257] = 0xE0;
 		
-		ILI9341_Set_Address(320-inc_wf, 0, 320-inc_wf, 240);
-		DISP_DC_DATA;
-		DISP_CS_SELECT;
-				for(i=16; i<496; i++){ 				
-						while(!(DISP_SPI->SR & SPI_SR_TXE)); 
-						SPI1_DR_8bit = buf_disp[i];
-				}
-		while(!(DISP_SPI->SR & SPI_SR_TXE)); 
-		while(DISP_SPI->SR & SPI_SR_BSY);	
-		DISP_CS_UNSELECT;//*/
-			
-		ILI9341_Set_Scroll_Margins(0, 260); // устанавливаем область прокрутки
-		ILI9341_Scroll_To(inc_wf); // прокручиваем
-		inc_wf++;
-		if (inc_wf>60){
-				inc_wf = 0;
-		}
+    // Задаем координаты на дисплее
+    ILI9341_Set_Address(320 - inc_wf, 0, 320 - inc_wf, 240);
+    
+    DISP_DC_DATA;
+    DISP_CS_SELECT; // Включаем дисплей
+
+    // -----------------------------------------------------------------
+    // ЗАПУСК ПЕРЕДАЧИ ЧЕРЕЗ DMA1_Channel5
+    // -----------------------------------------------------------------
+    DMA1_Channel5->CCR &= ~DMA_CCR5_EN;            // Выключаем канал для перезаписи
+    DMA1_Channel5->CMAR  = (uint32_t)&buf_disp[16]; // Стартуем строго с 16-го элемента массива!
+    DMA1_Channel5->CNDTR = 480;                     // Передать ровно 480 байт
+    DMA1_Channel5->CCR |= DMA_CCR5_EN;             // Включаем DMA — строка полетела в SPI2
+    // -----------------------------------------------------------------
+    // Освобождаем CS сразу после окончания строки
+    // -----------------------------------------------------------------
+    while (DMA1_Channel5->CNDTR != 0) __NOP();      // Ждем, пока DMA допишет все 480 байт
+    while (SPI2->SR & SPI_SR_BSY) __NOP();          // Ждем, пока SPI2 физически вытолкнет последний байт  
+    DISP_CS_UNSELECT; // СРАЗУ отпускаем дисплей! Теперь меню может спокойно рисовать поверх.
+
+    // Прокрутка экрана (выполняется, пока SPI отдыхает)
+    ILI9341_Set_Scroll_Margins(0, 260); 
+    ILI9341_Scroll_To(inc_wf); 
+    
+    inc_wf++;
+    if (inc_wf > 60){
+        inc_wf = 0;
+    }
+}
+
+
+void ILI9341_num18x34(uint16_t x, uint16_t y, uint8_t ch, uint16_t color, uint16_t bgcolor)
+{
+    uint32_t i, j;
+    uint32_t current_byte_index;
+    uint8_t b;
+    uint8_t bit_counter;
+
+    // Жесткие константы геометрии вашего нового шрифта
+    const uint8_t font_width = 18;
+    const uint8_t font_height = 34;
+    const uint32_t bytes_per_line = 3; 
+
+    // Защита от выхода за границы массива (разрешены только индексы 0-11)
+    if (ch > 11) return;
+
+    // Установка адреса на дисплее с использованием жестких размеров
+    ILI9341_Set_Address(x, y, x + font_width - 1, y + font_height - 1);
+    DISP_DC_DATA;
+    DISP_CS_SELECT;
+
+    for(i = 0; i < font_height; i++)
+    {
+        uint32_t current_byte_offset = 0;
+        
+        // Вычисляем точный байтовый индекс в плоском массиве Font18x34
+        current_byte_index = ch * font_height * bytes_per_line + (i * bytes_per_line);
+        
+        // Прямое чтение байта из байтового массива, без каких-либо приведений типов
+        b = Font18x34[current_byte_index + current_byte_offset];
+        bit_counter = 0;
+
+        for(j = 0; j < font_width; j++)
+        {
+            // Если вычитали все 8 бит из текущего байта, переходим к следующему байту в строке
+            if (bit_counter == 8) 
+            {
+                current_byte_offset++;
+                b = Font18x34[current_byte_index + current_byte_offset];
+                bit_counter = 0;
+            }
+
+            // Ваша проверенная логика старшего бита с инверсией цвета
+            if(!((b << bit_counter) & 0x80))
+            {
+                ILI9341_Write_Data(color >> 8);
+                ILI9341_Write_Data(color & 0xFF);
+            }
+            else
+            {
+                ILI9341_Write_Data(bgcolor >> 8);
+                ILI9341_Write_Data(bgcolor & 0xFF);
+            }
+
+            bit_counter++;
+        }
+    }
+    DISP_CS_UNSELECT;
 }
 
 void ILI9341_Draw_MainFrec(uint16_t x, uint16_t y, uint32_t freq){
@@ -674,21 +727,53 @@ void ILI9341_Draw_MainFrec(uint16_t x, uint16_t y, uint32_t freq){
     char new_txt_buf[12];
     format_freq(freq, new_txt_buf); // Формируем новую строку
 
-    for (int i = 0; i < 10; i++) {
-        // Если символ в этой позиции изменился
+    // Текущая динамическая координата X для отрисовки символа
+    uint16_t current_x = x; 
+
+    // Перебираем символы до конца буфера (или пока не встретим конец строки '\0')
+    for (int i = 0; new_txt_buf[i] != '\0' && i < 12; i++) {
+        
+        // 1. Проверяем, является ли символ разделителем (например, точкой, пробелом или запятой)
+        if (new_txt_buf[i] == '.' || new_txt_buf[i] == ' ' || new_txt_buf[i] == ',') {
+            
+            // Если символ в этой позиции изменился, можем затереть старое место фоном 
+            // (или просто пропустить, если там и так был пробел)
+            if (new_txt_buf[i] != old_txt_freq[i]) {
+                // Здесь при необходимости можно очистить прямоугольник 9х34 цветом MYFON,
+                // но обычно для пробела достаточно просто сдвинуть координату.
+                old_txt_freq[i] = new_txt_buf[i];
+            }
+            
+            // СДВИГАЕМ НА ПОЛОВИНУ ПРОБЕЛА (9 пикселей)
+            current_x += 9; 
+            continue; // Переходим к следующему символу в строке, цифру не рисуем
+        }
+
+        // 2. Если это обычный символ/цифра, проверяем изменился ли он
         if (new_txt_buf[i] != old_txt_freq[i]) {
-            // Вычисляем X координату для конкретного символа
-            // Ширина Font_16x26 равна 16 пикселям
-            uint16_t char_x = x + (i * 16); 
-            if ((i==0)&&(new_txt_buf[i] =='0')){
-            ILI9341_WriteChar(char_x, y, new_txt_buf[i], Font_16x26, BORDERCL, MYFON);}
-						else{
-						ILI9341_WriteChar(char_x, y, new_txt_buf[i], Font_16x26, GREEN, MYFON);}
+            
+            // Защита: проверяем, что это цифра, чтобы не улететь по индексам в минус
+            if (new_txt_buf[i] >= '0' && new_txt_buf[i] <= '9') {
+                
+                // Логика гашения ведущего нуля (первый символ '0' красим в цвет BORDERCL)
+                if ((i == 0) && (new_txt_buf[i] == '0')) {
+                    ILI9341_num18x34(current_x, y, new_txt_buf[i] - 48, BORDERCL, MYFON);
+                }
+                else {
+                    ILI9341_num18x34(current_x, y, new_txt_buf[i] - 48, GREEN, MYFON);
+                }
+            }
             
             // Запоминаем изменение
             old_txt_freq[i] = new_txt_buf[i];
         }
+
+        // После отрисовки стандартной цифры сдвигаем X на полную ширину (18 пикселей)
+        current_x += 18; 
     }
+//		            ILI9341_num18x34(46, 40, /*new_txt_buf[i]-17*/3, Font_18x34, BORDERCL, MYFON);
+//						
+//						ILI9341_num18x34(46+50, 40, /*new_txt_buf[i]-17*/4, Font_18x34, GREEN, MYFON);
 }
 
 void ILI9341_Draw_Frec11x18(uint16_t x, uint16_t y, uint32_t freq){  // рисуем частоту маленьким шрифтом
@@ -753,9 +838,34 @@ void format_var(int32_t f, char *out){ // Переменную в строку
     }
 }
 
-void ILI9341_Draw_Menu_Var(uint16_t x, uint16_t y, int32_t var){ // Рисуем переменные в меню
-    char new_txt_buf[8];
-    format_var(var, new_txt_buf); // Формируем новую строку
+void ILI9341_Draw_Menu_Var(uint16_t x, uint16_t y, uint8_t leng, int32_t var){ // Рисуем переменные в меню
+    char new_txt_buf[leng];
+    //format_var(var, new_txt_buf); // Формируем новую строку
+    // Заполняем пробелами
+    for(int n = 0; n < leng; n++) new_txt_buf[n] = ' ';   
+    new_txt_buf[leng] = '\0'; // Терминатор строки
+    int pos = leng-1; // Начинаем заполнение с самого конца 
+
+    if (var == 0) {
+        new_txt_buf[leng-1] = '0';
+        return; 
+    }
+
+    // Запоминаем знак и переводим в положительное число через uint32_t
+    int is_negative = (var < 0);
+    uint32_t u_f = is_negative ? (uint32_t)(-var) : (uint32_t)var;
+
+    // Расщепляем число на цифры
+    while (u_f > 0 && pos >= 0) {
+        new_txt_buf[pos--] = (u_f % 10) + '0';
+        u_f /= 10;
+    }
+
+    // Если число было отрицательным, ставим минус перед ним
+    if (is_negative && pos >= 0) {
+        new_txt_buf[pos] = '-';
+    }
+		
 		ILI9341_WriteString(x, y, new_txt_buf, Font_11x18, GREEN, MYFON);
 }
 
@@ -940,7 +1050,7 @@ void ILI9341_Draw_Smetr(q15_t value){
     } else if (target_bar_height < bar_height) {
         // Линейное и плавное падение в пикселях.
         // ПОДБОР СКОРОСТИ: 1 - очень медленно, 2 - среднее, 5 - быстро, 10 - мгновенно.
-        #define DROP_SPEED_PIXELS 3 
+        #define DROP_SPEED_PIXELS 1 
         
         bar_height -= DROP_SPEED_PIXELS;
         
@@ -1230,7 +1340,7 @@ void ILI9341_WriteChar(uint16_t x, uint16_t y, char ch, FontDef font, uint16_t c
 {
     uint32_t i, b, j, h = 0;
 
-    ILI9341_Set_Address(x, y, x + font.width - 1, y + font.height - 1);
+  ILI9341_Set_Address(x, y, x + font.width - 1, y + font.height - 1);
 	DISP_DC_DATA;
 	DISP_CS_SELECT;
     for(i = 0; i < font.height; i++)
@@ -1265,7 +1375,9 @@ void ILI9341_WriteChar(uint16_t x, uint16_t y, char ch, FontDef font, uint16_t c
   //  while(!dma_spi_fl);
     DISP_CS_UNSELECT;//*/
   //  dma_spi_fl=0;
+
 }
+
 
 // Вывод строки
 void ILI9341_WriteString(uint16_t x, uint16_t y, const char* str, FontDef font, uint16_t color, uint16_t bgcolor)

@@ -16,9 +16,10 @@ uint8_t    waterful_gain = 2;            // Усиление водопада биты или 6дб
 uint32_t   bandpass_ranges[5] =          // Диапазоны полосового фильтра и фнч
  {2000000, 4000000, 8000000, 16000000, 30000000};
 
-uint16_t   bandwidth[5] =                 // Полосы фильтра зч под индексы модуляции
+uint16_t   bandwidth_rx[5] =              // Полосы фильтра зч под индексы модуляции на прием
    {500, 2800, 2800, 5000, 5000};         // 0:cw, 1:lsb, 2:usb, 3:am  4:fm    /*  */  
-	 
+uint16_t   bandwidth_tx[5] =              // Полосы фильтра зч под индексы модуляции на передачу
+   {500, 2800, 2800, 5000, 5000};         // 0:cw, 1:lsb, 2:usb, 3:am  4:fm    /*  */  	 
 
 extern trx_state_t     trx_state;         // Состояние трансивера
 extern trx_state_f     trx_state_flag;    // Флаги состояния трансивера
@@ -32,8 +33,10 @@ q15_t      in_I_ch = 0;                   // Входной сигнал In-phase   (Re) 15би
 q15_t      in_Q_ch = 0;                   // Входной сигнал Quadrature (Im) 15бит без постоянной составляющей adc2-16384
 q15_t      out_I_ch = 0;                  // Выдной сигнал 
 q15_t      out_Q_ch = 1;                  // Выдной сигнал 
-q15_t      in_I_up = 0;                   // Входной сигнал апскей на два
-q15_t      in_Q_up = 0;                   // Входной сигнал апскей на два
+q15_t      in_I_up = 0;                   // Входной сигнал довнсемплинг
+q15_t      in_Q_up = 0;                   // Входной сигнал довнсемплинг
+q15_t      out_rx  = 0;                   // Выход готового сигнала по приему
+q15_t      out_rx_I  = 0;                   // Выход готового сигнала по передаче I
 ///////////////// CIC фильтр ////////////////////////////////////////////////////////////
 static int32_t i_i1 = 0, i_i2 = 0, i_i3 = 0; // Секция интеграторов для I
 static int32_t i_c1_z1 = 0, i_c2_z1 = 0, i_c3_z1 = 0; // Секция гребенки для I
@@ -41,12 +44,78 @@ static int32_t i_c1_z1 = 0, i_c2_z1 = 0, i_c3_z1 = 0; // Секция гребенки для I
 static int32_t q_i1 = 0, q_i2 = 0, q_i3 = 0; // Секция интеграторов для Q
 static int32_t q_c1_z1 = 0, q_c2_z1 = 0, q_c3_z1 = 0; // Секция гребенки для Q
 
-// Для перехода 42-21кгц
+// Для перехода 42-21-10кгц
+int16_t upscale_factor = 2;    // (задаёт режим: 2(21341Гц) или 4(10671Гц)).
+int16_t upscale_counter = 0;   // (счетчик тактов интерполяции).
 static int32_t i_int1 = 0, i_int2 = 0, i_int3 = 0;
 static int32_t q_int1 = 0, q_int2 = 0, q_int3 = 0;
 // Comb
-static int32_t i_d1 = 0, i_d2 = 0, i_d3 = 0;
-static int32_t q_d1 = 0, q_d2 = 0, q_d3 = 0;
+static int32_t i_d1 = 0, i_d2 = 0, i_d3 = 0, i_d4 = 0, i_d5 = 0, i_d6 = 0;
+static int32_t q_d1 = 0, q_d2 = 0, q_d3 = 0, q_d4 = 0, q_d5 = 0, q_d6 = 0;
+//////////////// Интерполяция перед ШИМ/////////////
+//10кгц - 42кгц - ФНЧ 5кгц - ШИМ
+
+//static int32_t iir_x1 = 512, iir_x2 = 512; // История входа
+//static int32_t iir_y1 = 512, iir_y2 = 512; // История выхода
+
+// Инициализируем структуры сразу готовыми целыми числами Q12 для среза 4.2 кГц
+// Инициализация структуры для канала I передачи
+biquad4_state_t lpf_filter_I = {
+    // ---------- Каскад 1 ----------
+    .x1 = 0,
+    .x2 = 0,
+    .y1 = 0,
+    .y2 = 0,
+
+    .b0 = 372,
+    .b1 = 743,
+    .b2 = 372,
+
+    .a1 = -3747,
+    .a2 = 960,
+
+    // ---------- Каскад 2 ----------
+    .k2_x1 = 0,
+    .k2_x2 = 0,
+    .k2_y1 = 0,
+    .k2_y2 = 0,
+
+    .k2_b0 = 372,
+    .k2_b1 = 743,
+    .k2_b2 = 372,
+
+    .k2_a1 = -4830,
+    .k2_a2 = 2422
+};
+
+// Инициализация структуры для канала Q передачи (один в один)
+biquad4_state_t lpf_filter_Q = {
+    // ---------- Каскад 1 ----------
+    .x1 = 0,
+    .x2 = 0,
+    .y1 = 0,
+    .y2 = 0,
+
+    .b0 = 372,
+    .b1 = 743,
+    .b2 = 372,
+
+    .a1 = -3747,
+    .a2 = 960,
+
+    // ---------- Каскад 2 ----------
+    .k2_x1 = 0,
+    .k2_x2 = 0,
+    .k2_y1 = 0,
+    .k2_y2 = 0,
+
+    .k2_b0 = 372,
+    .k2_b1 = 743,
+    .k2_b2 = 372,
+
+    .k2_a1 = -4830,
+    .k2_a2 = 2422
+};
 ////////// буферы I и Q и LPF каналов ////////////////////////////////////////////////////////
 #define buff_size 256                     // размер буферов
 #define buff_size_half 128                // размер половины буферов
@@ -64,6 +133,8 @@ arm_fir_instance_q15 f_hil;
 ///////////// Модуляция ////////////////////////	
 uint8_t	  mode = 3;                       // Модуляция  (0:SW 1:LSB 2:USB 3:AM 4:FM)
 
+// Пробуем Уивера(перенос на ПЧ)
+static uint8_t weaver_phase = 0; // Счетчик фазы
 
 
 //////////// ФНЧ на БИХ /////////////////
@@ -87,7 +158,7 @@ extern uint8_t lpf_stages;            // Порядок БИХ ФНЧ биквада
  * в -3 dB сместится чуть выше (примерно в 1.5 раза выше, чем Fc одного каскада).
  * То есть при SHIFT = 5 общая точка -3 dB будет в районе 150-160 Гц, что 
  * идеально завалит помеху 70 Гц (она уйдет в зону глубокого подавления). */
-#define HPF_SHIFT  3  // ФВЧ
+#define HPF_SHIFT  4  // ФВЧ
 // Глобальные переменные состояния фильтра (обнулить при старте процессора)
 static int64_t audio_lpf1 = 0;
 static int64_t audio_lpf2 = 0;
@@ -102,7 +173,7 @@ uint16_t fft_size = 256;                // Размер массива FFT
 /////////////////////	 Динамика(компрессор АРУ) ///////////////////////////
 // (масштабирование 9бит)
 AGC_Config rx_agc  = {// Настройки компрессора на прием
-  .threshold_bits = 9, 
+  .threshold_bits = 8, 
 	.attack = 3, 
 	.release = 8, 
   .env = 0, 
@@ -190,21 +261,35 @@ void HardFault_Handler(void) {
 
 
 
+
+
+
 void TIM4_IRQHandler(void) {
     if (TIM4->SR & TIM_SR_UIF) {
         TIM4->SR &= ~TIM_SR_UIF;
 				if (lpf_new) // Если обновились коэфициенты ФНЧ
 				{
-						lpf_new = 0;
-						// Переинициализируем фильтр на новое количество каскадов
-						arm_biquad_cascade_df1_init_q31(&S_LPF, lpf_stages, lpf_coeffs_new, lpf_state, 1);
+            Update_Biquad_LPF(&S_LPF, lpf_stages, lpf_coeffs, lpf_coeffs_new, lpf_state); // Прямая ручная инициализация структуры Biquad 
+						
+					  // -----------------------------------------------------------
+            // НАСТРОЙКА ПЕРИОДА ТАЙМЕРА НА ЛЕТУ ПО ТИПУ МОДУЛЯЦИИ
+            // -----------------------------------------------------------
+            // Важно: убедитесь, что в init таймера включен Preload: TIM4->CR1 |= TIM_CR1_ARPE;
+            if (mode == 1 || mode == 2) { 
+                TIM4->ARR = 256 - 1;  // ЗАМЕДЛЯЕМ таймер в 2 раза для LSB/USB
+            } 
+            else { 
+                TIM4->ARR = 128 - 1;  // Возвращаем быстрый темп для CW/AM/FM
+            }
+					
 				}
         // Если обработали первую половину буфера
         if ((c_buff >= buff_size_half) && (hil_half_fl)/**/) {
             // 1. Сначала считаем ФНЧ для ПЕРВОЙ половины
             arm_biquad_cascade_df1_q31(&S_LPF, &in_lpf[0], &out_lpf[0], buff_size_half);
 					  //arm_fir_fast_q15(&f_hil, &in_raw_q[0], &out_ht_q[0], buff_size_half);
-					  fast_hilbert_q15_custom(&f_hil, &in_raw_q[0], &out_ht_q[0], buff_size_half); // Своя реализация Гильберта
+				  	if (mode == 1 || mode == 2)
+					      fast_hilbert_q15_custom(&f_hil, &in_raw_q[0], &out_ht_q[0], buff_size_half); // Своя реализация Гильберта
 
             
             hil_half_fl = 0;
@@ -214,7 +299,8 @@ void TIM4_IRQHandler(void) {
             // 1. Сначала ФНЧ для ВТОРОЙ половины
             arm_biquad_cascade_df1_q31(&S_LPF, &in_lpf[buff_size_half], &out_lpf[buff_size_half], buff_size_half);
 				  	//arm_fir_fast_q15(&f_hil, &in_raw_q[buff_size_half], &out_ht_q[buff_size_half], buff_size_half); 
-				  	fast_hilbert_q15_custom(&f_hil, &in_raw_q[buff_size_half], &out_ht_q[buff_size_half], buff_size_half); // Своя реализация Гильберта
+					  if (mode == 1 || mode == 2)
+				      	fast_hilbert_q15_custom(&f_hil, &in_raw_q[buff_size_half], &out_ht_q[buff_size_half], buff_size_half); // Своя реализация Гильберта
 
             
             hil_half_fl = 1;
@@ -320,7 +406,7 @@ void PVD_IRQHandler(void)
 
             TRX_State_Save(); // Мгновенно шьем во Flash!
 
-            while (1); // Засыпаем навечно, ждем полной разрядки конденсатора
+            while (1); // Засыпаем, ждем полной разрядки конденсатора
         }
     }
 }
@@ -365,22 +451,173 @@ __STATIC_FORCEINLINE void Process_Audio_HPF(q31_t *sample) {
 
 
 
+
 /// ЦОС прерывание от DMA1
-__STATIC_FORCEINLINE void Fill_buff(void){	
-	// калибровка каналов			
+__STATIC_FORCEINLINE void Process_RX_Audio(void) {
+    in_raw_q[c_buff] = -in_Q_up; // Отдаем в буфер сырого для преобразования Гильберта
+    // Делаем задержку I канала для выравнивания с преобразованием Гильберта
+    // Кольцевой буфер размером в задержку
+    // Задержка = размер буфера + (длинна фильтра/2) - 1,  256 + (128/2) - 1 = 319;
+    out_I_ch = delay_arr[c_buff_delay];
+    delay_arr[c_buff_delay] = in_I_up;
+
+    // CW (mode == 0)
+    if(mode == 0){		
+        in_lpf[c_buff] = (int32_t)in_I_up + (int32_t)in_Q_up;
+    }				
+    
+    // LSB Режим (mode == 1)
+    if (mode == 1) {
+        in_lpf[c_buff] = out_ht_q[c_buff] + out_I_ch;
+    }
+    
+    // USB Режим (mode == 2)
+    if (mode == 2) {
+        in_lpf[c_buff] = out_ht_q[c_buff] - out_I_ch;
+    }
+    // AM
+    if (mode == 3) {
+        // Блоки I и Q без ветвления (вычисление модуля за 2 такта)
+        int32_t abs_i = (in_I_up ^ (in_I_up >> 31)) - (in_I_up >> 31);
+        int32_t abs_q = (in_Q_up ^ (in_Q_up >> 31)) - (in_Q_up >> 31);
+
+        // -----------------------------------------------------------------
+        // ТОЧНАЯ АППРОКСИМАЦИЯ ЛАЙОНСА (~99% точности)
+        // -----------------------------------------------------------------
+        // Математика: 31/32 * Max + 3/8 * Min  (примерно 0.968 * Max + 0.375 * Min)
+        // Компилятор превратит это в сдвиги без тяжелых умножений
+        if (abs_i > abs_q) {
+            in_lpf[c_buff] = (abs_i - (abs_i >> 5) + (abs_q >> 2) + (abs_q >> 3));
+        } else {
+            in_lpf[c_buff] = (abs_q - (abs_q >> 5) + (abs_i >> 2) + (abs_i >> 3));
+        }
+    }		
+    
+    //Process_Audio_HPF(&in_lpf[c_buff]);		// ФВЧ
+    if (out_lpf[c_buff] > s_peak) s_peak = out_lpf[c_buff];		// Детектор пиков для s-метра	
+    out_Q_ch = process_dynamic_gain(out_lpf[c_buff], &rx_agc);// Ограничение 9бит
+    out_rx = apply_gain(out_Q_ch, trx_state.volume); // Регулируем громкость
+    
+}
+
+__STATIC_FORCEINLINE void Process_TX_Audio(void) {
+    //in_lpf[c_buff] = in_Q_up; 
+    //p_data[1];
+	  
+	  in_lpf[c_buff] = in_Q_up;
+	
+    s_abs = out_lpf[c_buff];
+    if (s_abs < 0) s_abs = -s_abs;
+    if (s_abs > s_peak) s_peak = s_abs;
+	
+    in_raw_q[c_buff] = process_dynamic_gain(out_lpf[c_buff], &tx_comp)<<6; // С компрессора отдаем в буфер для Гилберта
+	
+    //in_raw_q[c_buff] = out_lpf[c_buff];   
+    out_I_ch = delay_arr[c_buff_delay];
+    delay_arr[c_buff_delay] = (int16_t)in_raw_q[c_buff];//	
+    out_Q_ch = out_ht_q[c_buff];
+}
+
+
+
+void Filter_Biquad_4th(int16_t *sample, biquad4_state_t *state) {
+    int64_t sum; 
+    int32_t out; 
+    int32_t in_val = (int32_t)(*sample); 
+
+    // ---------- Каскад 1 ---------- 
+    sum = (int64_t)in_val * state->b0 
+        + (int64_t)state->x1 * state->b1 
+        + (int64_t)state->x2 * state->b2 
+        - (int64_t)state->y1 * state->a1 
+        - (int64_t)state->y2 * state->a2; 
+        
+    out = (int32_t)(sum >> 14); // МЕНЯЕМ СДВИГ НА >> 14 (Q14)
+    
+    state->x2 = state->x1; state->x1 = in_val; state->y2 = state->y1; state->y1 = out; 
+
+    // ---------- Каскад 2 ---------- 
+    sum = (int64_t)out * state->k2_b0 
+        + (int64_t)state->k2_x1 * state->k2_b1 
+        + (int64_t)state->k2_x2 * state->k2_b2 
+        - (int64_t)state->k2_y1 * state->k2_a1 
+        - (int64_t)state->k2_y2 * state->k2_a2; 
+        
+    int32_t final_out = (int32_t)(sum >> 14); // МЕНЯЕМ СДВИГ НА >> 14 (Q14)
+    
+    state->k2_x2 = state->k2_x1; state->k2_x1 = out; state->k2_y2 = state->k2_y1; state->k2_y1 = final_out; 
+
+    // Ограничение диапазона int16_t 
+    if (final_out > INT16_MAX) final_out = INT16_MAX; 
+    else if (final_out < INT16_MIN) final_out = INT16_MIN; 
+
+    *sample = (int16_t)final_out; 
+}
+
+void Fill_buff(void){	
+// калибровка каналов			
 	// 1. Коррекция амплитуды канала I
-	// Умножение в формате Q15: (in_I_ch * cal_balance) >> 15. 
-	// Затем прибавляем к исходному сигналу и аппаратно ограничиваем до 15 бит.
 	int32_t I_cal = (int32_t)in_I_ch + (((int32_t)in_I_ch * cal_balance) >> 15);
 	in_I_ch = (q15_t)__SSAT(I_cal, 15);
 
 	// 2. Коррекция фазы канала Q
-	// Подмешиваем скорректированный канал I в канал Q и снова жестко насыщаем в 15 бит.
 	int32_t Q_cal = (int32_t)in_Q_ch + ((I_cal * cal_fase) >> 15);
 	in_Q_ch = (q15_t)__SSAT(Q_cal, 15);
-	// --------------------
-	// CIC Integrator
-	// --------------------
+
+	    // Статические переменные истории (должны сохранять значения между вызовами функции)
+    static int16_t in_I_old = 0;
+    static int16_t in_Q_old = 0;
+
+    // Временные переменные для хранения чистых входных отсчетов АЦП
+    int16_t temp_I = in_I_ch;
+    int16_t temp_Q = in_Q_ch;
+
+    // --- ЦИФРОВАЯ КОМПЕНСАЦИЯ ЗАВАЛА CIC3 ДЛЯ ОБОИХ КАНАЛОВ ---
+    // Приподнимаем высокие частоты, выравнивая "купол" фильтра
+    in_I_ch = in_I_ch + ((in_I_ch - in_I_old) >> 2);
+    in_Q_ch = in_Q_ch + ((in_Q_ch - in_Q_old) >> 2);
+
+    // Обновляем историю строго чистыми исходными отсчетами
+    in_I_old = temp_I;
+    in_Q_old = temp_Q;
+    int16_t w_I = 0;
+    int16_t w_Q = 0;
+
+			switch (weaver_phase)
+			{
+			case 0:
+					w_I =  in_I_ch;
+					w_Q =  in_Q_ch;
+					break;
+
+			case 1:
+					w_I = -in_Q_ch;
+					w_Q =  in_I_ch;
+					break;
+
+			case 2:
+					w_I = -in_I_ch;
+					w_Q = -in_Q_ch;
+					break;
+
+			case 3:
+					w_I =  in_Q_ch;
+					w_Q = -in_I_ch;
+					break;
+			}
+    // Инкрементируем счетчик фазы
+    weaver_phase = (weaver_phase + 1) & 3;
+
+		 in_I_ch = w_I;
+     in_Q_ch = w_Q;
+
+//    // ---  ФИЛЬТРАЦИЯ ПЧ 
+//    Filter_Biquad_4th(&in_I_ch, &weaver_lpf_I);
+//    Filter_Biquad_4th(&in_Q_ch, &weaver_lpf_Q);
+	
+  // ---------------------------------------------------------
+	// CIC Integrator (Работает ВСЕГДА на частоте АЦП 42682 Гц)
+	// ---------------------------------------------------------
 	i_int1 += in_I_ch;
 	i_int2 += i_int1;
 	i_int3 += i_int2;
@@ -388,118 +625,76 @@ __STATIC_FORCEINLINE void Fill_buff(void){
 	q_int1 += in_Q_ch;
 	q_int2 += q_int1;
 	q_int3 += q_int2;
-	if (upscale_flag){// если передескретизация выполнена
-		if (!rx_tx_fl){ // Прием/передача
-			// Если прием
-			in_raw_q[c_buff] = -in_Q_up; // Отдаем в буфер сырого для преобразования Гильберта
-			// Делаем задержку I канала для выравнивания с преобразованием Гильберта
-			// Коьцевой буфер размером в задержку
-			// Задержка = размер буфера + (длинна фильтра/2) - 1,  256 + (128/2) - 1 = 319;
-			out_I_ch = delay_arr[c_buff_delay];
-	  	delay_arr[c_buff_delay] = in_I_up;
-
-			// CW
-			if(mode == 0){		
-				in_lpf[c_buff] = in_I_up + in_Q_up;
-			}				
-			// LSB
-			if(mode == 1){
-			  in_lpf[c_buff] = out_ht_q[c_buff] + out_I_ch;
-			}
-			// USB
-			if(mode == 2){
-			  in_lpf[c_buff] = out_ht_q[c_buff] - out_I_ch;
-			}
-      // AM
-			if (mode == 3) {
-				// Берем модули I и Q каналов без ветвления
-				int32_t abs_i = (in_I_up ^ (in_I_up >> 31)) - (in_I_up >> 31);
-				int32_t abs_q = (in_Q_up ^ (in_Q_up >> 31)) - (in_Q_up >> 31);
-				// Аппроксимация альфа-бета: Max + Min/4
-				in_lpf[c_buff] = (abs_i > abs_q) ? (abs_i + (abs_q >> 2)) : (abs_q + (abs_i >> 2));
-			}		
-			
-			Process_Audio_HPF(&in_lpf[c_buff]);		// ФВЧ	
-			if (out_lpf[c_buff] > s_peak) s_peak = out_lpf[c_buff];		// Детектор пиков для s-метра	
-			out_Q_ch = process_dynamic_gain(out_lpf[c_buff], &rx_agc);// Ограничение 9бит
-      int16_t out_rx = apply_gain(out_Q_ch, trx_state.volume); // Регулируем громкость
-      out_rx += 512; // переводим значение в положительную область для вывода ШИМ
-			TIM3->CCR4 = (uint16_t)out_rx;
-		}
-		else{
-			// Если передача
-			//in_lpf[c_buff] = in_Q_up; 
-			//p_data[1];
-			s_abs = in_Q_up;
-			//s_abs = out_lpf[c_buff];
-			if (s_abs < 0) s_abs = -s_abs;
-			if (s_abs > s_peak) s_peak = s_abs;
-			//s_abs = process_dynamic_gain(in_Q_up, &tx_comp)<<6; // Ограничение 10бит
-			in_lpf[c_buff] = process_dynamic_gain(in_Q_up, &tx_comp)<<6; // Ограничение 9бит
-			in_raw_q[c_buff] = out_lpf[c_buff];   //
-			out_I_ch = delay_arr[c_buff_delay];
-	  	delay_arr[c_buff_delay] = (int16_t)__SSAT(out_lpf[c_buff], 16);//	
-			out_Q_ch = out_ht_q[c_buff];
-			TIM3->CCR1 = (uint16_t)((__SSAT(out_I_ch, 16)+32767)>>6);
-	  	TIM2->CCR4 = (uint16_t)((__SSAT(out_Q_ch, 16)+32767)>>6);		
-		}		
+	
+	// Инкрементируем счетчик децимации
+	upscale_counter++;
+	
+	// Если счетчик не дошел до нужного фактора прореживания (2 или 4)
+	if (upscale_counter < upscale_factor) {
 		
-
-		// Инкримент основных буферов
-		c_buff++; 
-		if (c_buff >= buff_size){ // если буфер заполнился
-			c_buff = 0; // обнуляем
-		}	
-
-		// Инкримент задержки Гилберта основных буферов
-		c_buff_delay++; 
-		if (c_buff_delay >= delay_hil){ // если буфер заполнился
-			c_buff_delay = 0; // обнуляем
-		}
-		// обновляем значения для апскейла
-		//in_I_up = in_I_ch;
-    //in_Q_up = in_Q_ch;
-		upscale_flag = false;
+		// Пропускаем такты. Для ДЕЦИМАТОРА на этих тактах аудио-обработка отдыхает.
+		// (Вы говорили, что инкременты строго вместе с обработкой звука)
+		
+		upscale_flag = false; // Сигнализируем, что новые низкочастотные данные еще НЕ готовы
 	}
-	else{
-		//------------------------
-		// CIC3 COMB
-		//------------------------
+	//---------------------------------------------------------
+	// НАСТАЛ ТАКТ РАСЧЕТА COMB (Пониженная частота: 21341 или 10671 Гц)
+	//---------------------------------------------------------
+	else {
+		upscale_counter = 0; // Сбрасываем счетчик тактов прореживания
 		int32_t t;
 
-		t = i_int3;
-		in_I_up = t - i_d1;
-		i_d1 = t;
+		// Структура гребенки одинакова для обоих режимов децимации! Задержка всегда z^-1
+		t = i_int3;   in_I_up = t - i_d1;   i_d1 = t;
+		t = in_I_up;  in_I_up = t - i_d2;   i_d2 = t;
+		t = in_I_up;  in_I_up = t - i_d3;   i_d3 = t;
 
-		t = in_I_up;
-		in_I_up = t - i_d2;
-		i_d2 = t;
+		t = q_int3;   in_Q_up = t - q_d1;   q_d1 = t;
+		t = in_Q_up;  in_Q_up = t - q_d2;   q_d2 = t;
+		t = in_Q_up;  in_Q_up = t - q_d3;   q_d3 = t;
 
-		t = in_I_up;
-		in_I_up = t - i_d3;
-		i_d3 = t;
+		// Динамическое масштабирование разрядности под коэффициент децимации
+		if (upscale_factor == 2) {
+			// Режим /2: частота 21341 Гц. Вход 14 бит + Gain 8 = 17 бит. Сдвиг >>2 дает Q15.
+			in_I_up >>= 2;
+			in_Q_up >>= 2;
+		}
+		else {
+			// Режим /4: частота 10671 Гц. Вход 14 бит + Gain 64 = 20 бит. Сдвиг >>5 дает Q15.
+			in_I_up >>= 5;
+			in_Q_up >>= 5;
+		}
 
+		// -----------------------------------------------------------------
+		// ОБРАБОТКА ЗВУКА И ИНКРЕМЕНТЫ (Строго синхронно с выходом из COMB)
+		// -----------------------------------------------------------------
+		if (!rx_tx_fl){ 
+			Process_RX_Audio(); // Вызов инлайн-функции приема
+		}
+		else {
+			Process_TX_Audio(); // Вызов инлайн-функции передачи
+		}
 
-		t = q_int3;
-		in_Q_up = t - q_d1;
-		q_d1 = t;
+		// Инкримент основных буферов звука
+		c_buff++; 
+		if (c_buff >= buff_size){ 
+			c_buff = 0; 
+		}	
 
-		t = in_Q_up;
-		in_Q_up = t - q_d2;
-		q_d2 = t;
+		// Инкримент задержки Гилберта
+		c_buff_delay++; 
+		if (c_buff_delay >= delay_hil){ 
+			c_buff_delay = 0; 
+		}
 
-		t = in_Q_up;
-		in_Q_up = t - q_d3;
-		q_d3 = t;
-
-
-		in_I_up >>= 2;
-		in_Q_up >>= 2;
-
-		upscale_flag = true;
+		upscale_flag = true; // Сигнализируем системе, что новые отсчеты дециматора ГОТОВЫ
 	}
 
-	if (!rx_tx_fl){ // Прием
+	if (!rx_tx_fl){ // Прием (42кгц)
+      Filter_Biquad_4th(&out_rx, &lpf_filter_Q);
+			Filter_Biquad_4th(&out_rx, &lpf_filter_I);
+			TIM3->CCR4 = (uint16_t)out_rx+512;
+			
 			// Заполняем массив FFT
 			if ((c_fft < fft_size)&&(!fft_arr_fl)){ // Если массив fft не заполнен
 				complex_in_fft[(c_fft<<1)] = in_Q_ch<<2;
@@ -512,9 +707,14 @@ __STATIC_FORCEINLINE void Fill_buff(void){
 			} 	
 	} else {//передача	
 			// Заполняем массив FFT
+		  Filter_Biquad_4th(&out_I_ch, &lpf_filter_I);
+			Filter_Biquad_4th(&out_Q_ch, &lpf_filter_Q);
+		  TIM3->CCR1 = (uint16_t)((__SSAT(out_I_ch, 16)+32767)>>6);
+      TIM2->CCR4 = (uint16_t)((__SSAT(out_Q_ch, 16)+32767)>>6);	
+		
 			if ((c_fft < fft_size)&&(!fft_arr_fl)){ // Если массив fft не заполнен
 				complex_in_fft[(c_fft<<1)] = out_I_ch>>2;
-				complex_in_fft[(c_fft<<1)+1] = -out_Q_ch>>2;     // заполняем re
+				complex_in_fft[(c_fft<<1)+1] = out_Q_ch>>2;     // заполняем re
 				c_fft++;
 			}
 			else{
@@ -613,10 +813,99 @@ __STATIC_FORCEINLINE int16_t process_dynamic_gain(int32_t sample_in, AGC_Config 
 void Button_Process(uint8_t code) { // Обработчик нажатия кнопок
 	switch (code) {
 		case 0x01: // Кнопка 1 (0001)
-			ILI9341_WriteString(   30, 30, "    Button 1", Font_11x18, GREEN, MYFON);
+		  if(!menu_fl){ // Если не в меню
+				if (trx_state.active_vfo) {                 // A/B
+					trx_state.active_vfo = false;
+				}
+				else {
+					trx_state.active_vfo = true;
+				}/**/
+				Redraw_A_B(); // Обновляем A/B VFO
+				Set_mode();           // Установка режима модуляции
+				Redraw_mode();        // Перерисовываем модуляцию
+				Redraw_bandwidth();   // Перерисовываем полосу
+			}
 			break;
 				
 		case 0x02: // Кнопка 2 (0010)
+			//Band+
+			if(!menu_fl){ // Если не в меню
+				if (trx_state.current_band<8) { trx_state.current_band++; } else { trx_state.current_band=0; }
+		    Redraw_Band();      // Обновляем диапазон
+				Redraw_A_B();       // Обновляем A/B VFO
+				Set_mode();         // Установка режима модуляции из trx_state
+				Redraw_mode();      // Перерисовываем модуляцию
+				Redraw_bandwidth(); // Перерисовываем полосу
+			} 
+			else{
+        Menu_Up();   // Меню шаг вверх  
+			}
+
+			break;
+				
+		case 0x03: // Кнопка 3 (0011) Mode
+		  	if(!menu_fl){ // Если не в меню
+						//Переключем модуляцию
+						if (mode<4){ mode++; }else{ mode=0; }
+						if(trx_state.active_vfo==0){ // Если VFO A
+							 trx_state.band_mode_a[trx_state.current_band] = mode;
+						}
+						if(trx_state.active_vfo==1){ // Если VFO B
+							 trx_state.band_mode_b[trx_state.current_band] = mode;
+						}
+						Set_mode();           // Установка режима модуляции из trx_state
+						Redraw_mode();        // Перерисовываем модуляцию
+						Redraw_bandwidth();   // Перерисовываем полосу
+				}
+				else{ // Если в меню кнопка выбора
+						Menu_Change();   // Выбор подменю по кнопке
+						Menu_Draw();     // Отрисовка меню
+				}
+			break;
+				
+		case 0x04: // Кнопка 4 (0100) 
+			// Громкость
+			if(!menu_fl){ // Если не в меню
+        if (trx_state_flag.volume_enabled){
+			  	trx_state_flag.volume_enabled = false;
+		  	}
+		  	else{
+			  	trx_state_flag.volume_enabled = true;
+			  }		
+		  	Redraw_volume();
+			}
+			break;
+				
+		case 0x05: // Кнопка 5 (0101) 
+			//Band-
+			if(!menu_fl){ // Если не в меню
+				if (trx_state.current_band>0) { trx_state.current_band--; } else { trx_state.current_band=8; }
+		    Redraw_Band();        // Обновляем диапазон
+				Redraw_A_B();         // Обновляем A/B VFO
+				Set_mode();           // Установка режима модуляции из trx_state
+				Redraw_mode();        // Перерисовываем модуляцию
+				Redraw_bandwidth();   // Перерисовываем полосу
+			}
+			else{
+        Menu_Down();   // Меню шаг вниз
+			}
+			break;
+				
+		case 0x06: // Кнопка 6 (0110)
+			// Полоса приема
+			if(!menu_fl){ // Если не в меню
+        if (trx_state_flag.bandwidth_enabled){
+			  	trx_state_flag.bandwidth_enabled = false;
+		  	}
+		  	else{
+			  	trx_state_flag.bandwidth_enabled = true;
+			  }	
+        Redraw_bandwidth();   // Перерисовываем полосу
+			} 
+
+			break;
+				
+		case 0x07: // Кнопка 7 (0111) 
 			//Шаг перестройки
 			switch (trx_state.tuning_step)				// Уменьшаем щаг, плашка под символами идет слева на право
 			{
@@ -628,81 +917,16 @@ void Button_Process(uint8_t code) { // Обработчик нажатия кнопок
 			Redraw_Step(trx_state.tuning_step, menu_fl);   // Рисуем шаг
 			break;
 				
-		case 0x03: // Кнопка 3 (0011) Mode
-		  	//Переключем модуляцию
-		    if (mode<4){ mode++; }else{ mode=0; }
-		    if(trx_state.active_vfo==0){ // Если VFO A
-					 trx_state.band_mode_a[trx_state.current_band] = mode;
-				}
-				if(trx_state.active_vfo==1){ // Если VFO B
-					 trx_state.band_mode_b[trx_state.current_band] = mode;
-				}
-				lpf_new = Calculate_lpf_Q31(bandwidth[mode], 21875.0f, &lpf_stages); // Установка полосы пропускания
-				Redraw_mode();        // Перерисовываем модуляцию
-			break;
-				
-		case 0x04: // Кнопка 4 (0100) Band+
-			if(!menu_fl){ // Если не в меню
-				if (trx_state.current_band<8) { trx_state.current_band++; } else { trx_state.current_band=0; }
-		    Redraw_Band();   // Обновляем диапазон
-				Redraw_A_B();    // Обновляем A/B VFO
-				Set_mode();      // Установка режима модуляции из trx_state
-				Redraw_mode();   // Перерисовываем модуляцию
-			} 
-			else{
-        Menu_Up();   // Меню шаг вверх  
-			}
-			break;
-				
-		case 0x05: // Кнопка 5 (0101) VFO A/B
-			//ILI9341_WriteString(   30, 30, "    Button 5", Font_11x18, GREEN, MYFON);
-		  if(!menu_fl){ // Если не в меню
-				if (trx_state.active_vfo) {                 // A/B
-					trx_state.active_vfo = false;
-				}
-				else {
-					trx_state.active_vfo = true;
-				}/**/
-				Redraw_A_B(); // Обновляем A/B VFO
-				Set_mode();      // Установка режима модуляции
-				Redraw_mode();   // Перерисовываем модуляцию
-			}
-			break;
-				
-		case 0x06: // Кнопка 6 (0110)
-			//ILI9341_WriteString(   30, 30, "    Button 6", Font_11x18, GREEN, MYFON);
-		  if(!menu_fl){ // Если не в меню
-
-			}
-		  else{ // Если в меню кнопка выбора
-        Menu_Change();  // Выбор подменю по кнопке
-				Menu_Draw();     // Отрисовка меню
-			}
-			break;
-				
-		case 0x07: // Кнопка 7 (0111) Band-
-			if(!menu_fl){ // Если не в меню
-				if (trx_state.current_band>0) { trx_state.current_band--; } else { trx_state.current_band=8; }
-		    Redraw_Band();  // Обновляем диапазон
-				Redraw_A_B();   // Обновляем A/B VFO
-				Set_mode();      // Установка режима модуляции из trx_state
-				Redraw_mode();   // Перерисовываем модуляцию
-			}
-			else{
-        Menu_Down();   // Меню шаг вниз
-			}
-			break;
-				
 		case 0x08: // Кнопка 8 (1000)
 			// RX/TX
 		  if(!menu_fl){ // Если не в меню
 				if (!rx_tx_fl) { rx_tx_fl = 1; } else { rx_tx_fl = 0; }
 				if (!rx_tx_fl) {                   // RX/TX
-					ILI9341_WriteString( 46, 108, "R", Font_16x26, GREEN, MYFON); // RX/TX
+					ILI9341_num18x34( 46, 103, 10, GREEN, MYFON); // RX
 					RX_Device_Inint();
 				}
 				else {
-					ILI9341_WriteString( 46, 108, "T", Font_16x26, GREEN, MYFON); // RX/TX
+					ILI9341_num18x34( 46, 103, 11, RED, MYFON); // TX
 					TX_Device_Inint();
 				}
 	  	}
@@ -720,29 +944,8 @@ void Button_Process(uint8_t code) { // Обработчик нажатия кнопок
 void Button_LongPress_Process(uint8_t code) { // Обработчик нажатия кнопок при длительном удержании
 	switch (code) {
 		case 0x01: // Кнопка 1 (0001)
-			ILI9341_WriteString(   30, 30, "LongButton 1", Font_11x18, GREEN, MYFON);
-			break;
-				
-		case 0x02: // Кнопка 2 (0010)
-      if (trx_state_flag.volume_enabled){
-				trx_state_flag.volume_enabled = false;
-			}
-			else{
-				trx_state_flag.volume_enabled = true;
-			}		
-			Redraw_volume();
-			break;
-				
-		case 0x03: // Кнопка 3 (0011)
-			ILI9341_WriteString(   30, 30, "LongButton 3", Font_11x18, GREEN, MYFON);
-			break;
-				
-		case 0x04: // Кнопка 4 (0100)
-			//ILI9341_WriteString(   30, 30, "LongButton 4", Font_11x18, GREEN, MYFON);
-			break;
-				
-		case 0x05: // Кнопка 5 (0101)
-			//ILI9341_WriteString(   30, 30, "LongButton 5", Font_11x18, GREEN, MYFON);
+			//ILI9341_WriteString(   46, 30, "TRX_State_Save", Font_11x18, GREEN, MYFON);
+		  //TRX_State_Save(); // Мгновенно шьем во Flash!
 		  if(!menu_fl){ // Если не в меню
 				if (trx_state.active_vfo) {                 // B=A
 					trx_state.vfo_a_freq[trx_state.current_band] = trx_state.vfo_b_freq[trx_state.current_band];
@@ -753,22 +956,38 @@ void Button_LongPress_Process(uint8_t code) { // Обработчик нажатия кнопок при д
 				Redraw_A_B();    // Обновляем A/B VFO
 				Set_mode();      // Установка режима модуляции из trx_state
 				Redraw_mode();   // Перерисовываем модуляцию
+				Redraw_bandwidth();   // Перерисовываем полосу
 			}
 			break;
 				
-		case 0x06: // Кнопка 6 (0110) Вход и выход в меню
+		case 0x02: // Кнопка 2 (0010)
+
+			break;
+				
+		case 0x03: // Кнопка 3 (0011) 
 			// Переходим в меню настроек
 		  if(!menu_fl){
-				menu_fl = true;
-				
-        Menu_Draw(); // Отрисовка меню
-				//Redraw_Step(trx_state.tuning_step, menu_fl);		// перерисовали шаг
+					menu_fl = true;			
+					Menu_Draw(); // Отрисовка меню
 			}
 			else{
-				menu_fl = false;
-        Redraw_Main_Scr();  // Перерисовываем основной экран
-				Set_mode();         // Установка режима модуляции
-			}		
+					menu_fl = false;
+					Redraw_Main_Scr();  // Перерисовываем основной экран
+					Set_mode();         // Установка режима модуляции
+			}	
+			break;
+				
+		case 0x04: // Кнопка 4 (0100)
+			//ILI9341_WriteString(   30, 30, "LongButton 4", Font_11x18, GREEN, MYFON);
+			break;
+				
+		case 0x05: // Кнопка 5 (0101)
+			//ILI9341_WriteString(   30, 30, "LongButton 5", Font_11x18, GREEN, MYFON);
+
+			break;
+				
+		case 0x06: // Кнопка 6 (0110) Вход и выход в меню
+	
 			
 			break;
 				

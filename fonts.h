@@ -1,8 +1,8 @@
 /*
  * fonts.h
  *
- *  Created on: 1 апр. 2020 г.
- *      Author: dima
+ *  
+ *      
  */
 
 #ifndef FONTS_H_
@@ -22,5 +22,7 @@ typedef struct {
 extern FontDef Font_7x10;
 extern FontDef Font_11x18;
 extern FontDef Font_16x26;
+//extern FontDef Font_18x34;
+extern const uint8_t Font18x34 [];
 
 #endif /* FONTS_H_ */

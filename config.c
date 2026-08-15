@@ -58,12 +58,13 @@ trx_state_t trx_state =
     .rit_enabled   = 0,
     .xit_enabled   = 0,
 		
-		.volume        = 50           
+		.volume        = 20           
 };
 
 trx_state_f trx_state_flag =  
 {
-		.volume_enabled = 0   // ‘лаг регулировки громкости    
+		.volume_enabled = 0,   // ‘лаг регулировки громкости 
+    .bandwidth_enabled = 0   // ‘лаг регулировки полосы
 };
 
 // ”казатель на место во Flash, где была найдена последн€€ рабоча€ запись

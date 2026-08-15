@@ -1,24 +1,26 @@
 #include "menu.h"
 
 
-extern volatile bool rx_tx_fl;                    // Прием(0) передача(1)
+extern volatile bool rx_tx_fl;                           // Прием(0) передача(1)
 
-extern int16_t      cal_si;                       // Калибровка si
-extern int16_t      cal_fase;                     // Калибровка фазы
-extern int16_t      cal_balance;                  // Калибровка баланса фаз
+extern int16_t      cal_si;                              // Калибровка si
+extern int16_t      cal_fase;                            // Калибровка фазы
+extern int16_t      cal_balance;                         // Калибровка баланса фаз
 
-extern uint32_t     bandpass_ranges[5];           // Диапазоны полосового фильтра и фнч
-extern uint16_t     bandwidth[4];                 // Полосы фильтра зч под индексы модуляции 0:cw, 1:ssb, 2:am, 3:fm 
-extern trx_state_t  trx_state;                    // Состояние трансивера
-extern bool         menu_fl;                      // Флаг входа в основное меню
-extern AGC_Config   rx_agc;                       // Настройки компрессора на прием
-extern AGC_Config   tx_comp;                      // Настройки компрессора на передачу
+extern uint32_t     bandpass_ranges[5];                  // Диапазоны полосового фильтра и фнч
+extern uint16_t     bandwidth_tx[5];                        // Полосы фильтра зч под индексы модуляции 0:cw, 1:ssb, 2:am, 3:fm 
+extern trx_state_t  trx_state;                           // Состояние трансивера
+extern bool         menu_fl;                             // Флаг входа в основное меню
+extern AGC_Config   rx_agc;                              // Настройки компрессора на прием
+extern AGC_Config   tx_comp;                             // Настройки компрессора на передачу
+//extern biquad4_state_t lpf_filter_I;                      // ФНЧ перед АЦП
+//extern biquad4_state_t lpf_filter_Q;                      // ФНЧ перед АЦП
 
-extern uint8_t      lpf_new;                      // Флаг готовности коэфициентов ФНЧ
-extern uint8_t      lpf_stages;                   // Порядок БИХ ФНЧ биквада
+//extern uint8_t      lpf_new;                             // Флаг готовности коэфициентов ФНЧ
+//extern uint8_t      lpf_stages;                          // Порядок БИХ ФНЧ биквада
 ///////////////////////////////// меню настроек ///////////////////////////////////////////
-bool       menu_fl = 0;                       // Флаг фхода в меню настроек
-bool       sub_menu_fl = 0;                   // Флаг фхода в подменю
+bool       menu_fl = 0;                                  // Флаг фхода в меню настроек
+bool       sub_menu_fl = 0;                              // Флаг фхода в подменю
 const char* MAIN_MENU[] = {
 	  "Bandwidth",         // 0
     "Calibration",       // 1
@@ -232,19 +234,19 @@ void Menu_DrawVar(uint8_t menu_idx, uint8_t sub_idx){ // Отрисовка переменных в 
 			"Back"*/
 			switch (sub_idx) {
 			case 0x00: // CW
-          ILI9341_Draw_Menu_Var(152, 0*18, bandwidth[0]);
+          ILI9341_Draw_Menu_Var(152, 0*18, 4, bandwidth_tx[0]);
 				break;
 			case 0x01: // LSB
-          ILI9341_Draw_Menu_Var(152, 1*18, bandwidth[1]);
+          ILI9341_Draw_Menu_Var(152, 1*18, 4, bandwidth_tx[1]);
 				break;
 			case 0x02: // USB
-          ILI9341_Draw_Menu_Var(152, 2*18, bandwidth[2]);
+          ILI9341_Draw_Menu_Var(152, 2*18, 4, bandwidth_tx[2]);
 				break;
 			case 0x03: // AM
-          ILI9341_Draw_Menu_Var(152, 3*18, bandwidth[3]);
+          ILI9341_Draw_Menu_Var(152, 3*18, 4, bandwidth_tx[3]);
 				break;
 			case 0x04: // FM
-          ILI9341_Draw_Menu_Var(152, 4*18, bandwidth[4]);
+          ILI9341_Draw_Menu_Var(152, 4*18, 4, bandwidth_tx[4]);
 				break;
 			}
 			break;
@@ -257,13 +259,13 @@ void Menu_DrawVar(uint8_t menu_idx, uint8_t sub_idx){ // Отрисовка переменных в 
       "Back"*/
 			switch (sub_idx) {
 			case 0x00: // si5351
-          ILI9341_Draw_Menu_Var(152, 0*18, cal_si);
+          ILI9341_Draw_Menu_Var(152, 0*18, 6, cal_si);
 				break;
 			case 0x01: // Phase
-          ILI9341_Draw_Menu_Var(152, 1*18, cal_fase);
+          ILI9341_Draw_Menu_Var(152, 1*18, 6, cal_fase);
 				break;
 			case 0x02: // Balance
-          ILI9341_Draw_Menu_Var(152, 2*18, cal_balance); 
+          ILI9341_Draw_Menu_Var(152, 2*18, 6, cal_balance); 
 				break;
 			case 0x03: // Reserved
 //          ILI9341_Draw_Menu_Var(152, 3*18, cal_auto_fl); 
@@ -298,7 +300,7 @@ void Menu_DrawVar(uint8_t menu_idx, uint8_t sub_idx){ // Отрисовка переменных в 
           ILI9341_WriteString( 152, 1*18, agc_time_strs[rx_agc.release], Font_11x18, GREEN, MYFON); 
 				break;
 			case 0x02: // Treshold
-          ILI9341_Draw_Menu_Var(152, 2*18, rx_agc.threshold_bits);
+          ILI9341_Draw_Menu_Var(152, 2*18, 2, rx_agc.threshold_bits);
 				break;
 			}
 			break;
@@ -316,7 +318,7 @@ void Menu_DrawVar(uint8_t menu_idx, uint8_t sub_idx){ // Отрисовка переменных в 
           ILI9341_WriteString( 152, 1*18, agc_time_strs[tx_comp.release], Font_11x18, GREEN, MYFON); 
 				break;
 			case 0x02: // Treshold
-          ILI9341_Draw_Menu_Var(152, 2*18, tx_comp.threshold_bits);
+          ILI9341_Draw_Menu_Var(152, 2*18, 2, tx_comp.threshold_bits);
 				break;
 			}
 			break;
@@ -330,19 +332,19 @@ void Menu_DrawVar(uint8_t menu_idx, uint8_t sub_idx){ // Отрисовка переменных в 
       "Back"*/
 			switch (sub_idx) {
 			case 0x00: // Filter 1
-          ILI9341_Draw_Menu_Var(152, 0*18, bandpass_ranges[0]);
+          ILI9341_Draw_Menu_Var(152, 0*18, 8, bandpass_ranges[0]);
 				break;
 			case 0x01: // Filter 2
-          ILI9341_Draw_Menu_Var(152, 1*18, bandpass_ranges[1]);
+          ILI9341_Draw_Menu_Var(152, 1*18, 8, bandpass_ranges[1]);
 				break;
 			case 0x02: // Filter 3
-          ILI9341_Draw_Menu_Var(152, 2*18, bandpass_ranges[2]);
+          ILI9341_Draw_Menu_Var(152, 2*18, 8, bandpass_ranges[2]);
 				break;
 			case 0x03: // Filter 4
-          ILI9341_Draw_Menu_Var(152, 3*18, bandpass_ranges[3]);
+          ILI9341_Draw_Menu_Var(152, 3*18, 8, bandpass_ranges[3]);
 				break;
 			case 0x04: // Filter 5
-          ILI9341_Draw_Menu_Var(152, 4*18, bandpass_ranges[4]);
+          ILI9341_Draw_Menu_Var(152, 4*18, 8, bandpass_ranges[4]);
 				break;	
 			}
 			break;
@@ -376,43 +378,53 @@ void Menu_Enc(uint8_t menu_idx, uint8_t sub_idx){ // Изменение по энкодеру
 			"Back"*/
 			switch (sub_idx) {
 			case 0x00: // CW
-				tmp = bandwidth[0];
-				if (Process_Encoder(&tmp, 10, 0, 6000)){ //
-          bandwidth[0] = tmp;
-					lpf_new = Calculate_lpf_Q31(bandwidth[0], 21875.0f, &lpf_stages); // Установка полосы пропускания
-          ILI9341_Draw_Menu_Var(152, 0*18, bandwidth[0]);
+				tmp = bandwidth_tx[0];
+				if (Process_Encoder(&tmp, 10, 0, 5000)){ //
+          bandwidth_tx[0] = tmp;
+					//lpf_new = Calculate_lpf_Q31(bandwidth_rx[0], 21875.0f, &lpf_stages); // Установка полосы пропускания
+					//Calculate_Biquad4_Butterworth(bandwidth_rx[0], 42682.0f, &lpf_filter_I);// Коэфициенты для самописного биквада ФНЧ Баттерворта
+          //Calculate_Biquad4_Butterworth(bandwidth_rx[0], 42682.0f, &lpf_filter_Q);
+          ILI9341_Draw_Menu_Var(152, 0*18, 4, bandwidth_tx[0]);
 				}
 				break;
 			case 0x01: // LSB
-				tmp = bandwidth[1];
-				if (Process_Encoder(&tmp, 10, 0, 6000)){ //
-          bandwidth[1] = tmp;
-          lpf_new = Calculate_lpf_Q31(bandwidth[1], 21875.0f, &lpf_stages); // Установка полосы пропускания
-          ILI9341_Draw_Menu_Var(152, 1*18, bandwidth[1]);
+				tmp = bandwidth_tx[1];
+				if (Process_Encoder(&tmp, 10, 0, 5000)){ //
+          bandwidth_tx[1] = tmp;
+          //lpf_new = Calculate_lpf_Q31(bandwidth_rx[1], 10671.0f, &lpf_stages); // Установка полосы пропускания
+					//Calculate_Biquad4_Butterworth(bandwidth_rx[1], 42682.0f, &lpf_filter_I);// Коэфициенты для самописного биквада ФНЧ Баттерворта
+          //Calculate_Biquad4_Butterworth(bandwidth_rx[1], 42682.0f, &lpf_filter_Q);
+          ILI9341_Draw_Menu_Var(152, 1*18, 4, bandwidth_tx[1]);
 				}
 				break;
 			case 0x02: // USB
-				tmp = bandwidth[2];
-				if (Process_Encoder(&tmp, 10, 0, 6000)){ //
-          bandwidth[2] = tmp;	
-					lpf_new = Calculate_lpf_Q31(bandwidth[2], 21875.0f, &lpf_stages); // Установка полосы пропускания
-          ILI9341_Draw_Menu_Var(152, 2*18, bandwidth[2]);
+				tmp = bandwidth_tx[2];
+				if (Process_Encoder(&tmp, 10, 0, 5000)){ //
+          bandwidth_tx[2] = tmp;	
+					//lpf_new = Calculate_lpf_Q31(bandwidth_rx[2], 10671.0f, &lpf_stages); // Установка полосы пропускания
+					//Calculate_Biquad4_Butterworth(bandwidth_rx[2], 42682.0f, &lpf_filter_I);// Коэфициенты для самописного биквада ФНЧ Баттерворта
+          //Calculate_Biquad4_Butterworth(bandwidth_rx[2], 42682.0f, &lpf_filter_Q);
+          ILI9341_Draw_Menu_Var(152, 2*18, 4, bandwidth_tx[2]);
 				}
 				break;
 			case 0x03: // AM
-				tmp = bandwidth[3];
-				if (Process_Encoder(&tmp, 10, 0, 6000)){ //
-          bandwidth[3] = tmp;
-					lpf_new = Calculate_lpf_Q31(bandwidth[3], 21875.0f, &lpf_stages); // Установка полосы пропускания
-          ILI9341_Draw_Menu_Var(152, 3*18, bandwidth[3]);
+				tmp = bandwidth_tx[3];
+				if (Process_Encoder(&tmp, 10, 0, 5000)){ //
+          bandwidth_tx[3] = tmp;
+					//lpf_new = Calculate_lpf_Q31(bandwidth_rx[3], 21875.0f, &lpf_stages); // Установка полосы пропускания
+					//Calculate_Biquad4_Butterworth(bandwidth_rx[3], 42682.0f, &lpf_filter_I);// Коэфициенты для самописного биквада ФНЧ Баттерворта
+          //Calculate_Biquad4_Butterworth(bandwidth_rx[3], 42682.0f, &lpf_filter_Q);
+          ILI9341_Draw_Menu_Var(152, 3*18, 4, bandwidth_tx[3]);
 				}
 				break;
 			case 0x04: // FM
-				tmp = bandwidth[4];
-				if (Process_Encoder(&tmp, 10, 0, 6000)){ //
-          bandwidth[4] = tmp;
-					lpf_new = Calculate_lpf_Q31(bandwidth[4], 21875.0f, &lpf_stages); // Установка полосы пропускания
-          ILI9341_Draw_Menu_Var(152, 4*18, bandwidth[4]);
+				tmp = bandwidth_tx[4];
+				if (Process_Encoder(&tmp, 10, 0, 5000)){ //
+          bandwidth_tx[4] = tmp;
+					//lpf_new = Calculate_lpf_Q31(bandwidth_rx[4], 21875.0f, &lpf_stages); // Установка полосы пропускания
+					//Calculate_Biquad4_Butterworth(bandwidth_rx[4], 42682.0f, &lpf_filter_I);// Коэфициенты для самописного биквада ФНЧ Баттерворта
+          //Calculate_Biquad4_Butterworth(bandwidth_rx[4], 42682.0f, &lpf_filter_Q);
+          ILI9341_Draw_Menu_Var(152, 4*18, 4, bandwidth_tx[4]);
 				}
 				break;
 			}
@@ -429,7 +441,7 @@ void Menu_Enc(uint8_t menu_idx, uint8_t sub_idx){ // Изменение по энкодеру
 				tmp = cal_si;
 				if (Process_Encoder(&tmp, trx_state.tuning_step, -32000, 32000)){ //
           cal_si = tmp;
-					ILI9341_Draw_Menu_Var(152, 0*18, cal_si);
+					ILI9341_Draw_Menu_Var(152, 0*18, 6, cal_si);
 					si5351_Init(cal_si);
 					if (!trx_state.active_vfo) { si5351_SetFrec(trx_state.vfo_a_freq[trx_state.current_band]<<2); }
 					else { si5351_SetFrec(trx_state.vfo_b_freq[trx_state.current_band]<<2); }
@@ -439,20 +451,20 @@ void Menu_Enc(uint8_t menu_idx, uint8_t sub_idx){ // Изменение по энкодеру
 				tmp = cal_fase;
 				if (Process_Encoder(&tmp, trx_state.tuning_step, -32000, 32000)){ //
           cal_fase = tmp;
-					ILI9341_Draw_Menu_Var(152, 1*18, cal_fase);		
+					ILI9341_Draw_Menu_Var(152, 1*18, 6, cal_fase);		
 				}
 				break;
 			case 0x02: // Balance
 				tmp = cal_balance;
 				if (Process_Encoder(&tmp, trx_state.tuning_step, -32000, 32000)){ //
 					cal_balance = tmp;
-          ILI9341_Draw_Menu_Var(152, 2*18, cal_balance);
+          ILI9341_Draw_Menu_Var(152, 2*18, 6, cal_balance);
 				}
 			case 0x03: // Reserved
 //				tmp = cal_auto_fl;
 //				if (Process_Encoder(&tmp, 1, 0, 1)){ //
 //					cal_auto_fl = tmp;
-//          ILI9341_Draw_Menu_Var(152, 3*18, cal_auto_fl);
+//          ILI9341_Draw_Menu_Var(152, 3*18, 1, cal_auto_fl);
 //				}
 				break;
 			}
@@ -496,7 +508,7 @@ void Menu_Enc(uint8_t menu_idx, uint8_t sub_idx){ // Изменение по энкодеру
 					tmp = rx_agc.threshold_bits;
 					if (Process_Encoder(&tmp, 1, 0, 15)){ // Если энкодер крутили
 						rx_agc.threshold_bits = tmp;
-            ILI9341_Draw_Menu_Var(152, 2*18, rx_agc.threshold_bits);
+            ILI9341_Draw_Menu_Var(152, 2*18, 2, rx_agc.threshold_bits);
 					}
 				break;
 			}
@@ -526,7 +538,7 @@ void Menu_Enc(uint8_t menu_idx, uint8_t sub_idx){ // Изменение по энкодеру
 					tmp = tx_comp.threshold_bits;
 					if (Process_Encoder(&tmp, 1, 0, 15)){ // Если энкодер крутили
 						tx_comp.threshold_bits = tmp;
-            ILI9341_Draw_Menu_Var(152, 2*18, tx_comp.threshold_bits);
+            ILI9341_Draw_Menu_Var(152, 2*18, 2, tx_comp.threshold_bits);
 					}
 				break;
 			}
@@ -541,19 +553,19 @@ void Menu_Enc(uint8_t menu_idx, uint8_t sub_idx){ // Изменение по энкодеру
       "Back"*/
 			switch (sub_idx) {
 			case 0x00: // Filter 1
-          //ILI9341_Draw_Menu_Var(152, 0*18, bandpass_ranges[0]);
+          //ILI9341_Draw_Menu_Var(152, 0*18, 8, bandpass_ranges[0]);
 				break;
 			case 0x01: // Filter 2
-          //ILI9341_Draw_Menu_Var(152, 1*18, bandpass_ranges[1]);
+          //ILI9341_Draw_Menu_Var(152, 1*18, 8, bandpass_ranges[1]);
 				break;
 			case 0x02: // Filter 3
-          //ILI9341_Draw_Menu_Var(152, 2*18, bandpass_ranges[2]);
+          //ILI9341_Draw_Menu_Var(152, 2*18, 8, bandpass_ranges[2]);
 				break;
 			case 0x03: // Filter 4
-          //ILI9341_Draw_Menu_Var(152, 3*18, bandpass_ranges[3]);
+          //ILI9341_Draw_Menu_Var(152, 3*18, 8, bandpass_ranges[3]);
 				break;
 			case 0x04: // Filter 5
-          //ILI9341_Draw_Menu_Var(152, 4*18, bandpass_ranges[4]);
+          //ILI9341_Draw_Menu_Var(152, 4*18, 8, bandpass_ranges[4]);
 				break;	
 			}
 			break;

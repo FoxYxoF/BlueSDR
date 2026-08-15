@@ -84,11 +84,12 @@ void ILI9341_Draw_Horizontal_Line(uint16_t X, uint16_t Y, uint16_t Width, uint16
 // отрисовываем интерфейс
 void apply_smoothing(q15_t* new_mag); // усреднение водопада
 void ILI9341_Draw_Waterfall(uint16_t* data); // водопад FFT
+void ILI9341_num18x34(uint16_t x, uint16_t y, uint8_t ch, uint16_t color, uint16_t bgcolor);
 void ILI9341_Draw_MainFrec(uint16_t x, uint16_t y, uint32_t freq); // Выводим основную частоту
 void ILI9341_Draw_Frec11x18(uint16_t x, uint16_t y, uint32_t freq);  // рисуем частоту маленьким шрифтом
 void format_freq(uint32_t f, char *out); // Число в частоту
 void format_var(int32_t f, char *out); // Число в строку
-void ILI9341_Draw_Menu_Var(uint16_t x, uint16_t y, int32_t var); // Рисуем переменные в меню
+void ILI9341_Draw_Menu_Var(uint16_t x, uint16_t y, uint8_t leng, int32_t var); // Рисуем переменные в меню
 void ILI9341_Draw_Scale();// рисуем шкалу рядом с водопадом
 void Draw_SMeter_Labels(int16_t analog_gain_db, uint16_t bar_right_x); // Рисуем шкалу s-метра
 void ILI9341_Draw_Smetr(q15_t value); // водопад полосу s-метра

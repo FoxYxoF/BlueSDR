@@ -1,2 +1,11 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Явно указываем кодировку UTF-8 для исходников Keil
+*.c text working-tree-encoding=utf-8
+*.h text working-tree-encoding=utf-8
+
+# Защита бинарников Keil от порчи при коммите (переносы строк ломают проект)
+*.uvprojx binary
+*.uvoptx binary
+*. can binary8

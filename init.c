@@ -18,15 +18,18 @@ extern q15_t     pstate_hil[n_coeff_hil + block_size_h]; // массив состояний
 //extern uint8_t    band_idx;                              // Текущий диапазон
 //extern uint32_t   bands_frec_a[];                        // Диапазоны частота
 //extern uint32_t   bands_frec_b[];                        // Диапазоны частота
-extern uint32_t   bandpass_ranges[];                     // Диапазоны полосового фильтра и фнч
+extern uint32_t                     bandpass_ranges[];   // Диапазоны полосового фильтра и фнч
 extern trx_state_t                  trx_state;           // Состояние трансивера
 extern trx_state_f                  trx_state_flag;      // Флаги состояния трансивера
 extern uint8_t	                    mode;                // Модуляция  (0:SW 1:LSB 2:USB 3:AM 4:FM)
-extern uint16_t                     bandwidth[5];        // Полосы фильтра зч под индексы модуляции
+extern int16_t                      upscale_factor;      // Задаёт режим: 2(21341Гц) или 4(10671Гц)
+extern uint16_t                     bandwidth_rx[5];     // Полосы фильтра зч на прием
 extern uint32_t                     main_frec;           // Основная частоа
 extern uint16_t                     step;                // Шаг перестройки
 extern bool                         rx_tx_fl;            // RX/TX
 
+extern biquad4_state_t lpf_filter_I;                      // ФНЧ перед АЦП
+extern biquad4_state_t lpf_filter_Q;                      // ФНЧ перед АЦП
 
 // Счетчики
 extern uint16_t   c_fft;             // Счетчик заполнения массива FFT
@@ -57,63 +60,82 @@ extern char old_txt_freq[];  // Текстовый буфер для частоты
 //////////////////////////////////////////////////////
 
 
-void SysTick_Setup(void) {  // Настройка системного таймера
-	FLASH->ACR |= 0x02; 		  // Flash latency = 2
-	RCC->CR |= RCC_CR_HSEON;	// Запустить HSE
-	while (!(RCC->CR & RCC_CR_HSERDY)) __NOP(); // Дождаться запуска
-	RCC->CFGR |= (7 << 18)		// PLL x9
-	          | RCC_CFGR_PLLSRC  // ВЫБРАТЬ HSE (это и есть 16-й бит!)
-						|  RCC_CFGR_ADCPRE_DIV6		  // ADC Prescaler /6
-						|  (4 << 8);		  // APB1 Prescaler /2
-	Clock_112MHz();
-	RCC->CR |= RCC_CR_PLLON;	// Включить PLL
-	while (!(RCC->CR & RCC_CR_PLLRDY)) __NOP(); // Ждать готовности PLL
-	RCC->CFGR |= 0x02;	// Переключиться на тактирование от PLL
-	SysTick->LOAD = 72000;
-	// Счетчик включить, прерывания будут, источник тактирования SYSTEM OSC
-	SysTick->CTRL |= SysTick_CTRL_ENABLE | SysTick_CTRL_TICKINT | SysTick_CTRL_CLKSOURCE; 	
-	
-	NVIC_SetPriority(SysTick_IRQn, 15);
-	NVIC_EnableIRQ(SysTick_IRQn);
-}
-
-void Clock_112MHz(void) { // Разгон
-    // 1. Включаем HSE (внешний кварц)
+void Clock_System_Init(void) {
+    // -----------------------------------------------------------------
+    // 1. СИСТЕМНЫЙ РАЗГОН ЯДРА И ВСЕХ ШИН ДО 112 МГц (HSE 8MHz * PLL 14)
+    // -----------------------------------------------------------------
+    
+    // Включаем внешний кварц HSE
     RCC->CR |= RCC_CR_HSEON;
-    while(!(RCC->CR & RCC_CR_HSERDY));
+    while (!(RCC->CR & RCC_CR_HSERDY)) __NOP();
 
-    // 2. Настройка Flash Latency! Это критично.
-    // Для 72-96 МГц нужно 2 цикла ожидания (Two wait states)
-    // Если гнать выше 100 МГц, может потребоваться удача, так как официально 2 — предел.
-    FLASH->ACR |= FLASH_ACR_LATENCY_2;
+    // Настройка Flash Latency = 2 цикла ожидания (предел для F103)
+    FLASH->ACR = (FLASH->ACR & ~FLASH_ACR_LATENCY) | FLASH_ACR_LATENCY_2;
 
-    // 3. Настройка делителей шин (чтобы периферия не сошла с ума)
-    RCC->CFGR |= RCC_CFGR_HPRE_DIV1;  // AHB = 96 MHz
-    RCC->CFGR |= RCC_CFGR_PPRE2_DIV1; // APB2 = 96 MHz (Макс по паспорту 72)
-    RCC->CFGR |= RCC_CFGR_PPRE1_DIV2; // APB1 = 48 MHz (Макс по паспорту 36)
+    // Экстремальный разгон: все шины работают на частоте ядра (112 МГц)
+    RCC->CFGR = RCC_CFGR_HPRE_DIV1   // AHB  = 112 MHz (Ядро)
+              | RCC_CFGR_PPRE2_DIV1  // APB2 = 112 MHz (Вместо паспортных 72)
+              | RCC_CFGR_PPRE1_DIV1  // APB1 = 112 MHz (Вместо паспортных 36)
+              | RCC_CFGR_ADCPRE_DIV8 // ADC Prescaler /8 => ADCCLK = 14 MHz (Держим точность АЦП)
+              | RCC_CFGR_PLLSRC_HSE  // Источник PLL = Внешний кварц HSE
+              | RCC_CFGR_PLLMULL14;  // Множитель PLL = x14 (8MHz * 14 = 112MHz)
 
-    // 4. Множитель PLL = 12 (8 * 12 = 96) 14-112мГц 16-128мГц
-    RCC->CFGR &= ~RCC_CFGR_PLLMULL; // Очистка
-    RCC->CFGR |= RCC_CFGR_PLLSRC_HSE | RCC_CFGR_PLLMULL14;
-
-    // 5. Включаем PLL
+    // Включаем PLL
     RCC->CR |= RCC_CR_PLLON;
-    while(!(RCC->CR & RCC_CR_PLLRDY));
+    while (!(RCC->CR & RCC_CR_PLLRDY)) __NOP();
 
-    // 6. Переключаемся на PLL
-    RCC->CFGR &= ~RCC_CFGR_SW;
-    RCC->CFGR |= RCC_CFGR_SW_PLL;
-    while((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL);
+    // Переключаем системное тактирование (SYSCLK) на выход PLL
+    RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_SW) | RCC_CFGR_SW_PLL;
+    while ((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL) __NOP();
+
+    // -----------------------------------------------------------------
+    // 2. НАСТРОЙКА СИСТЕМНОГО ТАЙМЕРА (SysTick)
+    // -----------------------------------------------------------------
+    // При частоте ядра 112 МГц: шаг прерывания 1 мс = 112 000 000 / 1000
+    SysTick->LOAD = 112000 - 1; 
+    SysTick->VAL  = 0;
+    SysTick->CTRL = SysTick_CTRL_ENABLE | SysTick_CTRL_TICKINT | SysTick_CTRL_CLKSOURCE; 	
+	
+    // Выставляем низший приоритет прерывания для системного тика
+    NVIC_SetPriority(SysTick_IRQn, 15); 
+    NVIC_EnableIRQ(SysTick_IRQn);
+
+    // -----------------------------------------------------------------
+    // 3. ОБЪЕДИНЕННОЕ ВКЛЮЧЕНИЕ ТАКТИРОВАНИЯ ПЕРИФЕРИИ (Экономия Flash)
+    // -----------------------------------------------------------------
+    
+    // AHB Шина: Включаем DMA1
+    RCC->AHBENR |= RCC_AHBENR_DMA1EN;
+
+    // APB2 Шина: GPIOA, GPIOB, GPIOC, AFIO, TIM1, ADC1, ADC2
+    RCC->APB2ENR |= (RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPBEN | RCC_APB2ENR_IOPCEN 
+
+                   | RCC_APB2ENR_AFIOEN | RCC_APB2ENR_TIM1EN | RCC_APB2ENR_ADC1EN 
+                   | RCC_APB2ENR_ADC2EN);
+
+    // APB1 Шина: SPI2, TIM2, TIM3, TIM4, I2C1, PWR
+    RCC->APB1ENR |= (RCC_APB1ENR_SPI2EN | RCC_APB1ENR_TIM2EN | RCC_APB1ENR_TIM3EN 
+
+                   | RCC_APB1ENR_TIM4EN | RCC_APB1ENR_I2C1EN | RCC_APB1ENR_PWREN);
+
+    // -----------------------------------------------------------------
+    // 4. ОПТИМИЗАЦИЯ И РЕМАП ПИНОВ АЛЬТЕРНАТИВНЫХ ФУНКЦИЙ
+    // -----------------------------------------------------------------
+    
+    // Отключаем JTAG (освобождаем PA15, PB3, PB4 под кнопки) и делаем РЕМАП I2C1 (PB8, PB9)
+    AFIO->MAPR = (AFIO->MAPR & ~AFIO_MAPR_SWJ_CFG) 
+               | AFIO_MAPR_SWJ_CFG_JTAGDISABLE 
+               | AFIO_MAPR_I2C1_REMAP;
 }
 
 void GPIO_Init(void){	// инициализация портов ввода вывода
-	/* GPIO Ports Clock Enable */
-	/* Включаем тактирование портов GPIO */
-	RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;	// Включить тактирование GPIOB
-	RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;	// Включить тактирование GPIOB
-	RCC->APB2ENR |= RCC_APB2ENR_IOPCEN;	// Включить тактирование GPIOB
-	// Отключаем JTAG, оставляем только SWD (PA13/PA14)
-  AFIO->MAPR |= AFIO_MAPR_SWJ_CFG_JTAGDISABLE;	
+//	/* GPIO Ports Clock Enable */
+//	/* Включаем тактирование портов GPIO */
+//	RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;	// Включить тактирование GPIOB
+//	RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;	// Включить тактирование GPIOB
+//	RCC->APB2ENR |= RCC_APB2ENR_IOPCEN;	// Включить тактирование GPIOB
+//	// Отключаем JTAG, оставляем только SWD (PA13/PA14)
+//  AFIO->MAPR |= AFIO_MAPR_SWJ_CFG_JTAGDISABLE;	
  
 	// Для SPI2
 	// Настройка пинов (PB13 - SCK, PB15 - MOSI)
@@ -207,7 +229,7 @@ void GPIO_Init(void){	// инициализация портов ввода вывода
 
 
 void SPI2_init(void){	 
-	RCC->APB1ENR |=RCC_APB1ENR_SPI2EN;
+//	RCC->APB1ENR |=RCC_APB1ENR_SPI2EN;
 
 
 	
@@ -225,8 +247,8 @@ void SPI2_init(void){
 }
 
 void PWM2_Init(void) { // Инициализация шим
-    // 1. Включить тактирование GPIOA и TIM2
-    RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
+//    // 1. Включить тактирование GPIOA и TIM2
+//    RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
 
     // 3. Настройка таймера TIM2
     TIM2->PSC = 1 - 1;       // Прескалер: 72 МГц / 1 = 72 МГц 
@@ -249,8 +271,8 @@ void PWM2_Init(void) { // Инициализация шим
 }
 
 void PWM3_Init(void) { // Инициализация шим
-    // 1. Включить тактирование GPIOA и TIM2
-    RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
+//    // 1. Включить тактирование GPIOA и TIM2
+//    RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
 
     // 3. Настройка таймера TIM2
     TIM3->PSC = 1 - 1;       // Прескалер: 112 МГц / 1 = 112 МГц 
@@ -267,8 +289,8 @@ void PWM3_Init(void) { // Инициализация шим
 }
 
 void TIM4_Init(void) { // инициализация таймера 4 для массивов преобразования Гилберта и ФНЧ
-    // 1. Включить тактирование TIM4
-    RCC->APB1ENR |= RCC_APB1ENR_TIM4EN;
+//    // 1. Включить тактирование TIM4
+//    RCC->APB1ENR |= RCC_APB1ENR_TIM4EN;
 
     // 2. Настройка делителя (Prescaler)
     // Таймер частотой 112 МГц / 8(предделитель ацп)/41(28.5 + 12.5 циклов на обработку одного семла)/16(предискретизация)
@@ -276,25 +298,36 @@ void TIM4_Init(void) { // инициализация таймера 4 для массивов преобразования Ги
 
     // 3. Настройка периода (Auto-reload)
     // / 256 (размер буферного массива)
-    TIM4->ARR = 128 - 1; 
+    TIM4->ARR = 128 - 1;  // Считаем полубуфер
 
     // 4. Включить прерывание по переполнению (Update Interrupt)
     TIM4->DIER |= TIM_DIER_UIE;
 
     // 5. Разрешить прерывание в NVIC
-	  NVIC_SetPriority(TIM4_IRQn, 1); // приоритет прерывания 
+	  NVIC_SetPriority(TIM4_IRQn, 2); // приоритет прерывания 
     NVIC_EnableIRQ(TIM4_IRQn);
 
     // 6. Включить таймер
     //TIM4->CR1 |= TIM_CR1_CEN;
 }
 
-void ADC_DMA_Init(void) {  // Инициализация АЦП и ПДП
-  // 1. Тактирование
-  RCC->APB2ENR |=  RCC_APB2ENR_ADC1EN | RCC_APB2ENR_ADC2EN;
-  RCC->AHBENR  |=  RCC_AHBENR_DMA1EN;
-  RCC->CFGR    |=  RCC_CFGR_ADCPRE_DIV8; // ADC Clock = 112MHz/8 = 14MHz
 
+void SPI2_DMA_Init(void) {
+    // Тактирование DMA1 уже включено в вашей главной маске RCC->AHBENR!
+    
+    DMA1_Channel5->CPAR  = (uint32_t)&(SPI2->DR); // Адрес регистра данных SPI2
+    
+    // Настройка регистра управления CCR для Channel5:
+    DMA1_Channel5->CCR   = DMA_CCR5_DIR           // Направление: из памяти в периферию (DIR = 1)
+                         | DMA_CCR5_MINC          // Инкремент адреса памяти (MINC = 1)
+                         | DMA_CCR5_PL_1;         // Приоритет DMA: Высокий (PL = 10)
+                         // Размер памяти и периферии по умолчанию 8 бит (00)
+    
+    // Аппаратно разрешаем SPI2 запрашивать передачу через DMA
+    SPI2->CR2 |= SPI_CR2_TXDMAEN; 
+}
+
+void ADC_DMA_Init(void) {  // Инициализация АЦП и ПДП
 	DMA1_Channel1->CPAR = (uint32_t) &ADC1->DR; 
 	DMA1_Channel1->CMAR = (uint32_t) &adcData;
 	DMA1_Channel1->CNDTR = (uint32_t)16;
@@ -306,7 +339,7 @@ void ADC_DMA_Init(void) {  // Инициализация АЦП и ПДП
 													| DMA_CCR1_TCIE     // Прерывание по полному выполнению
 													| DMA_CCR1_HTIE;    // Прерывание по половине
 	DMA1_Channel1->CCR |= DMA_CCR1_EN;          // Включаем DMA1 канал1
-	NVIC_SetPriority(DMA1_Channel1_IRQn, 0);    // Приоритет прерывания DMA1 максимальный(0)
+	NVIC_SetPriority(DMA1_Channel1_IRQn, 1);    // Приоритет прерывания DMA1 максимальный(0)
 	NVIC_EnableIRQ (DMA1_Channel1_IRQn);        // Разрешаем прерывания DMA1
 
 	ADC1->CR2 |= ADC_CR2_ADON;
@@ -380,12 +413,12 @@ void I2C1_Recover(void) { // перезапускаем зависший I2C
     // I2C1_Init(); 
 }
 void I2C1_Init(void) { // Инициализация I2C1
-	// 1. Включение тактирования портов, I2C1 и альтернативных функций (AFIO)
-	RCC->APB2ENR |= RCC_APB2ENR_IOPBEN | RCC_APB2ENR_AFIOEN;
-	RCC->APB1ENR |= RCC_APB1ENR_I2C1EN;
+//	// 1. Включение тактирования портов, I2C1 и альтернативных функций (AFIO)
+//	RCC->APB2ENR |= RCC_APB2ENR_IOPBEN | RCC_APB2ENR_AFIOEN;
+//	RCC->APB1ENR |= RCC_APB1ENR_I2C1EN;
 
-	// 2. Ремаппинг I2C1 на PB8 и PB9
-	AFIO->MAPR |= AFIO_MAPR_I2C1_REMAP;
+//	// 2. Ремаппинг I2C1 на PB8 и PB9
+//	AFIO->MAPR |= AFIO_MAPR_I2C1_REMAP;
 
 	// 3. Настройка PB8 (SCL) и PB9 (SDA) как Alternate Function Open-Drain (50MHz)
 	// Очистка битов конфигурации для PB8 и PB9 (регистр CRH, так как пины > 7)
@@ -413,8 +446,8 @@ void I2C1_Init(void) { // Инициализация I2C1
 }
 
 void TIM1_Encoder_Init(void) {  // Инициализация энкодера
-    // 1. Включаем тактирование GPIOA, альтернативных функций и TIM1
-    RCC->APB2ENR |= (RCC_APB2ENR_IOPAEN | RCC_APB2ENR_AFIOEN | RCC_APB2ENR_TIM1EN);
+//    // 1. Включаем тактирование GPIOA, альтернативных функций и TIM1
+//    RCC->APB2ENR |= (RCC_APB2ENR_IOPAEN | RCC_APB2ENR_AFIOEN | RCC_APB2ENR_TIM1EN);
 
     //2. Настройка PA8
     GPIOA->CRH &= ~GPIO_CRH_MODE8; // Сброс всех бит пина 8 MODE = 00 (Input)
@@ -447,9 +480,9 @@ void TIM1_Encoder_Init(void) {  // Инициализация энкодера
 }
 
 void PWR_Init(void)  { // Инициализация контроля питания
-    
-    RCC->APB1ENR |= RCC_APB1ENR_PWREN;   // Включаем тактирование PWR
-    RCC->APB2ENR |= RCC_APB2ENR_AFIOEN;  // Включаем тактирование AFIO (без этого EXTI16 не заведется!)
+//    
+//    RCC->APB1ENR |= RCC_APB1ENR_PWREN;   // Включаем тактирование PWR
+//    RCC->APB2ENR |= RCC_APB2ENR_AFIOEN;  // Включаем тактирование AFIO (без этого EXTI16 не заведется!)
 
     // НАСТРОЙКА УРОВНЯ PVD (2.9V)
     // Очищаем биты PLS и выставляем 2.9V (для STM32F103 это биты 111, то есть все три маски)
@@ -474,8 +507,8 @@ void PWR_Init(void)  { // Инициализация контроля питания
 }
 
 void GPIO_Init_Buttons(void) { // Инициализация кнопок
-    // 1. Тактирование портов и альтернативных функций
-    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPBEN | RCC_APB2ENR_AFIOEN;
+//    // 1. Тактирование портов и альтернативных функций
+//    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPBEN | RCC_APB2ENR_AFIOEN;
 
     // 2. ОСВОБОЖДЕНИЕ ПИНОВ PA15, PB3, PB4 (Отключаем JTAG, оставляем SWD)
     // Важно: не используйте |=, так как это поле из 3-х бит.
@@ -520,22 +553,82 @@ void GPIO_Init_Buttons(void) { // Инициализация кнопок
     NVIC_EnableIRQ(EXTI15_10_IRQn); // Обрабатывает PA15
 }
 
+void Update_Biquad_LPF(arm_biquad_casd_df1_inst_q31 *S, uint8_t stages, q31_t *coeffs_dest, const q31_t *coeffs_src, q31_t *state_buf) {
+    // Оставляем ручное заполнение структуры — это экономит Flash, убирая код функции init
+    S->numStages = stages;
+    S->pCoeffs   = coeffs_src;
+    S->pState    = state_buf;
+    S->postShift = 1;
+
+    if (lpf_new) {
+        // Возвращаем эффективный и компактный memcpy
+        // В архитектуре DF1 на каждый каскад фильтра приходится строго 5 коэффициентов по 4 байта (q31_t)
+        memcpy(coeffs_dest, coeffs_src, (uint32_t)stages * 5 * sizeof(q31_t));
+
+        // Возвращаем эффективный и компактный memset
+        // Размер буфера состояний Biquad по стандарту ARM равен: 4 * numStages элементов по 4 байта (q31_t)
+        memset(state_buf, 0, (uint32_t)stages * 4 * sizeof(q31_t));
+
+        lpf_new = 0; // Сбрасываем флаг обновления
+    }
+}
+// Расчет коэфициентов для самописного биквада ФНЧ Баттерворта
+void Calculate_Biquad4_Butterworth(float cutOffFreq, float sampleRate, biquad4_state_t *state) {
+    float pi = 3.1415926535f;
+    float omega = tanf(pi * cutOffFreq / sampleRate);
+    float omega2 = omega * omega;
+
+    // --- КАСКАД 1 --- 
+    float q1 = 0.541f; // Классическое значение для 4-го порядка
+    float delta1 = omega2 + omega / q1 + 1.0f;
+    
+    state->b0 = (int32_t)((omega2 / delta1) * 16384.0f);
+    state->b1 = (int32_t)(((2.0f * omega2) / delta1) * 16384.0f);
+    state->b2 = state->b0;
+    
+    // ЧИСТЫЕ ИСХОДНЫЕ ЗНАКИ (Без инверсий!). 
+    // На выходе: a1 гарантированно ОТРИЦАТЕЛЬНЫЙ, a2 гарантированно ПОЛОЖИТЕЛЬНЫЙ.
+    state->a1 = (int32_t)(((2.0f * (omega2 - 1.0f)) / delta1) * 16384.0f);
+    state->a2 = (int32_t)(((omega2 - omega / q1 + 1.0f) / delta1) * 16384.0f);
+
+    // --- КАСКАД 2 ---
+    // Чтобы фильтр не песочил, но и не возбуждался, выставляем оптимальный Q2 = 1.306
+    // Это дает идеальный компромисс: срез ачх Баттерворта
+    float q2 = 1.306f; 
+    float delta2 = omega2 + omega / q2 + 1.0f;
+    
+    // громкость звука будет стопроцентной (1:1), как вы и хотели.
+    state->k2_b0 = (int32_t)((omega2 / delta2) * 16384.0f);
+    state->k2_b1 = (int32_t)(((2.0f * omega2) / delta2) * 16384.0f);
+    state->k2_b2 = state->k2_b0;
+    
+    // ЧИСТЫЕ ИСХОДНЫЕ ЗНАКИ для второго каскада
+    state->k2_a1 = (int32_t)(((2.0f * (omega2 - 1.0f)) / delta2) * 16384.0f);
+    state->k2_a2 = (int32_t)(((omega2 - omega / q2 + 1.0f) / delta2) * 16384.0f);
+
+    // Сброс истории для безопасности при пересчете частоты
+    state->x1 = 0; state->x2 = 0; state->y1 = 0; state->y2 = 0;
+    state->k2_x1 = 0; state->k2_x2 = 0; state->k2_y1 = 0; state->k2_y2 = 0;
+}
+
 void DSP_init(void){  // Инициализация функций библиотеки DSP
 	coeff_hilbert_init();
-	arm_fir_init_q15(&f_hil, n_coeff_hil, coeff_hil_q15, pstate_hil, block_size_h); // Инициализация КИХ Гилберта
-	
-
-	lpf_new = Calculate_lpf_Q31(bandwidth[mode], 21875.0f, &lpf_stages); // Установка полосы пропускания 
-
-	arm_biquad_cascade_df1_init_q31(&S_LPF, lpf_stages, lpf_coeffs_new, lpf_state, 1);
-	if (lpf_new)
-	{
-		memcpy(lpf_coeffs,
-					 lpf_coeffs_new,
-					 sizeof(lpf_coeffs));
-		memset(lpf_state, 0, sizeof(lpf_state));
-		lpf_new = 0;
+	//arm_fir_init_q15(&f_hil, n_coeff_hil, coeff_hil_q15, pstate_hil, block_size_h); // Инициализация КИХ Гилберта
+	// Кастомная ультра-легкая инициализация (Тратит всего около 12-20 байт)
+	f_hil.numTaps = n_coeff_hil;
+	f_hil.pCoeffs = coeff_hil_q15;
+	f_hil.pState  = pstate_hil;
+	// Ручное быстрое обнуление буфера состояний без использования тяжелого memset
+	// Размер буфера по стандарту CMSIS-DSP равен: numTaps + blockSize - 1
+	uint32_t total_state_len = (uint32_t)n_coeff_hil + (uint32_t)block_size_h - 1;
+	for (uint32_t i = 0; i < total_state_len; i++) {
+			pstate_hil[i] = 0;
 	}
+	
+	lpf_new = Calculate_lpf_Q31(bandwidth_rx[mode], 21875.0f, &lpf_stages);        // Установка полосы пропускания 
+	Calculate_Biquad4_Butterworth(bandwidth_rx[mode], 42682.0f, &lpf_filter_I);    // Расчет коэфициентов для самописного биквада ФНЧ Баттерворта
+  Calculate_Biquad4_Butterworth(bandwidth_rx[mode], 42682.0f, &lpf_filter_Q);    // Расчет коэфициентов для самописного биквада ФНЧ Баттерворта
+  Update_Biquad_LPF(&S_LPF, lpf_stages, lpf_coeffs, lpf_coeffs_new, lpf_state);  // Прямая ручная инициализация структуры Biquad 
 }
 
 void RX_Device_Inint(void){  // Инициализация ЦАП и АЦП на прием
@@ -638,7 +731,7 @@ uint8_t Calculate_lpf_Q31(float cutOffFreq, float sampleRate, uint8_t *out_stage
     float fc = cutOffFreq;
     
     // Автоматический выбор количества биквадов (stages) в зависимости от полосы
-    uint8_t stages = (fc <= 800.0f) ? 6 : 8; 
+    uint8_t stages = (fc <= 800.0f) ? 2 : 8; 
     
     // Записываем результат по указателю, если он передан
     if (out_stages != NULL) {
@@ -661,14 +754,14 @@ uint8_t Calculate_lpf_Q31(float cutOffFreq, float sampleRate, uint8_t *out_stage
         float b2 = b0;
         float a1 = 2.0f * (omega2 - 1.0f) / delta;
         float a2 = (omega2 - omega / q + 1.0f) / delta;
-
+			
         lpf_coeffs_new[i * 5 + 0] = (q31_t)(b0 * 1073741824.0f);
         lpf_coeffs_new[i * 5 + 1] = (q31_t)(b1 * 1073741824.0f);
         lpf_coeffs_new[i * 5 + 2] = (q31_t)(b2 * 1073741824.0f);
         lpf_coeffs_new[i * 5 + 3] = (q31_t)(-a1 * 1073741824.0f);
         lpf_coeffs_new[i * 5 + 4] = (q31_t)(-a2 * 1073741824.0f);
     }
-    
+
     return 1; // Возвращаем 1 (поднимаем флаг готовности коэффициентов)
 }
 
@@ -851,7 +944,7 @@ void si5351_SetFrec(uint32_t frec){
 	// Определение необходимого диапазона
 	uint8_t new_range = 4; // По умолчанию самый верхний диапазон (> 16 МГц)
 	for (uint8_t i = 0; i < 5; i++) {
-			if ((frec>>2) <= bandpass_ranges[i]) {
+			if ((frec) <= bandpass_ranges[i]) {
 					new_range = i;
 					break;
 			}
@@ -885,6 +978,7 @@ void si5351_SetFrec(uint32_t frec){
 			// Запоминаем новый активный диапазон
 			current_range = new_range;
 	} 
+	frec = (frec-10671)<<2; // Компенсация смещения на пч 10671гц и умножения на 4 для формирования квадратур
 	// Установка частоты на CLK0
 	// Параметры: частота в Гц, ток драйвера (2MA, 4MA, 6MA, 8MA)
 	si5351_SetupCLK0(frec, SI5351_DRIVE_STRENGTH_6MA);
@@ -895,14 +989,26 @@ void si5351_SetFrec(uint32_t frec){
 	//si5351_EnableOutputs((1 << 2) | (1 << 0));
 }
 
+
 void Set_mode(){               // Установка режима модуляции из trx_state
-  if(trx_state.active_vfo==0){ // Если VFO A
+	if(trx_state.active_vfo==0){ // Если VFO A
 		mode = trx_state.band_mode_a[trx_state.current_band];
 	}
-  if(trx_state.active_vfo==1){ // Если VFO B
+	if(trx_state.active_vfo==1){ // Если VFO B
 		mode = trx_state.band_mode_b[trx_state.current_band];
 	}
-	lpf_new = Calculate_lpf_Q31(bandwidth[mode], 21875.0f, &lpf_stages); // Установка полосы пропускания
+
+	// Автоматически определяем нужный апскейл в зависимости от модуляции
+	if (mode == 1 || mode == 2) { // LSB или USB
+		upscale_factor = 4;       // Нужен Гильберт -> включаем /4
+		lpf_new = Calculate_lpf_Q31(bandwidth_rx[mode], 10671.0f, &lpf_stages); 
+	} else {                      // CW, AM, FM
+		upscale_factor = 2;       // Гильберт не нужен -> возвращаем /2
+		lpf_new = Calculate_lpf_Q31(bandwidth_rx[mode], 21875.0f, &lpf_stages); 
+	}
+	
+	Calculate_Biquad4_Butterworth(bandwidth_rx[mode], 42682.0f, &lpf_filter_I);  // Расчет коэфициентов ФНЧ для выхода удаления алиасов
+  Calculate_Biquad4_Butterworth(bandwidth_rx[mode], 42682.0f, &lpf_filter_Q);  // Расчет коэфициентов ФНЧ Баттерворта
 }
 
 void Main_Scren_Init(void){         // Инициализация основного экрана
@@ -917,18 +1023,22 @@ void Main_Scren_Init(void){         // Инициализация основного экрана
 }
 
 void Redraw_A_B(void){             // Перерисовываем A/B VFO
-	memset(old_txt_freq, 0, 12);     // обнуляем текстовый буфер вывода частоты
+	//memset(old_txt_freq, 0, 12);     // обнуляем текстовый буфер вывода частоты
+	((uint32_t*)old_txt_freq)[0] = 0; // обнуляем текстовый буфер вывода частоты
+  ((uint32_t*)old_txt_freq)[1] = 0;
+  ((uint32_t*)old_txt_freq)[2] = 0;
+	
 	if (!trx_state.active_vfo) {                 // A/B
 	  ILI9341_WriteString( 46, 108-26, "VFO B", Font_11x18, GREEN, MYFON); // vfo a/vfo b
 		ILI9341_Draw_Frec11x18(46 + 84, 108-26, trx_state.vfo_b_freq[trx_state.current_band]);
-		ILI9341_Draw_MainFrec(78, 108, trx_state.vfo_a_freq[trx_state.current_band]); // выводим основную частоу
-		si5351_SetFrec(trx_state.vfo_a_freq[trx_state.current_band]<<2);
+		ILI9341_Draw_MainFrec(78, 103, trx_state.vfo_a_freq[trx_state.current_band]); // выводим основную частоу
+		si5351_SetFrec(trx_state.vfo_a_freq[trx_state.current_band]);
 	}
 	else {
 		ILI9341_WriteString( 46, 108-26, "VFO A", Font_11x18, GREEN, MYFON); // vfo a/vfo b
 		ILI9341_Draw_Frec11x18(46 + 84, 108-26, trx_state.vfo_a_freq[trx_state.current_band]);
-		ILI9341_Draw_MainFrec(78, 108, trx_state.vfo_b_freq[trx_state.current_band]); // выводим основную частоу
-		si5351_SetFrec(trx_state.vfo_b_freq[trx_state.current_band]<<2);
+		ILI9341_Draw_MainFrec(78, 103, trx_state.vfo_b_freq[trx_state.current_band]); // выводим основную частоу
+		si5351_SetFrec(trx_state.vfo_b_freq[trx_state.current_band]);
 	}/**/
 	Redraw_Step(trx_state.tuning_step, 0);        // Рисуем плашки шага под основной частотой
 }
@@ -967,33 +1077,43 @@ void Redraw_Band(void){     // Обновляем диапазон
 }
 
 void Redraw_mode(void){  // Перерисовываем модуляцию
-	ILI9341_WriteString( 46, 108 + 26, "Mode - ", Font_11x18, GREEN, MYFON);
+	ILI9341_WriteString(          46, 139+21, "Mode", Font_11x18, BORDERCL, MYFON);
 	switch (mode) {
 		case 0x00: // CW
-		  ILI9341_WriteString( 46+11*7, 108 + 26, " CW", Font_11x18, GREEN, MYFON); //
+		  ILI9341_WriteString( 46+55, 139+21, " CW", Font_11x18, GREEN, MYFON); //
 		  break;
 		case 0x01: // LSB
-		  ILI9341_WriteString( 46+11*7, 108 + 26, "LSB", Font_11x18, GREEN, MYFON); //
+		  ILI9341_WriteString( 46+55, 139+21, "LSB", Font_11x18, GREEN, MYFON); //
 		  break;
 		case 0x02: // USB
-		  ILI9341_WriteString( 46+11*7, 108 + 26, "USB", Font_11x18, GREEN, MYFON); //
+		  ILI9341_WriteString( 46+55, 139+21, "USB", Font_11x18, GREEN, MYFON); //
 		  break;
 		case 0x03: // AM
-		  ILI9341_WriteString( 46+11*7, 108 + 26, " AM", Font_11x18, GREEN, MYFON); //
+		  ILI9341_WriteString( 46+55, 139+21, " AM", Font_11x18, GREEN, MYFON); //
 		  break;
 		case 0x04: // FM
-		  ILI9341_WriteString( 46+11*7, 108 + 26, " FM", Font_11x18, GREEN, MYFON); //
+		  ILI9341_WriteString( 46+55, 139+21, " FM", Font_11x18, GREEN, MYFON); //
 		  break;
 	}
 }
 
 void Redraw_volume(void){  // Перерисовываем громкость
-	ILI9341_Draw_Menu_Var( 46+11*9, 108 + 26 + 18, trx_state.volume);
+	ILI9341_Draw_Menu_Var( 46+55, 180+21, 3, trx_state.volume);
 	if (trx_state_flag.volume_enabled){           // Если регулируем громкость
-	  ILI9341_WriteString( 46, 108 + 26 + 18, "Volume - ", Font_11x18, GREEN, MYFON);
+	  ILI9341_WriteString( 46, 180+21, "Vol", Font_11x18, RED, MYFON);
 	}
 	else{
-		ILI9341_WriteString( 46, 108 + 26 + 18, "Volume - ", Font_11x18, BORDERCL, MYFON);
+		ILI9341_WriteString( 46, 180+21, "Vol", Font_11x18, BORDERCL, MYFON);
+	}
+}
+
+void Redraw_bandwidth(void){  // Перерисовываем полосу
+	ILI9341_Draw_Menu_Var( 146+44, 139+21, 4, bandwidth_rx[mode]);
+	if (trx_state_flag.bandwidth_enabled){           // Если регулируем полосу
+	  ILI9341_WriteString( 146, 139+21, "BW", Font_11x18, RED, MYFON);
+	}
+	else{
+		ILI9341_WriteString( 146, 139+21, "BW", Font_11x18, BORDERCL, MYFON);
 	}
 }
 
@@ -1001,45 +1121,56 @@ void Redraw_Main_Scr(void){  // Перерисовываем главный экран
 	// Отрисовка основного экрана
 	ILI9341_Draw_Rectangle(46, 0, 243-46, 240, MYFON);
 	if (!rx_tx_fl) {                   // RX/TX
-		ILI9341_WriteString( 46, 108, "R", Font_16x26, GREEN, MYFON); // RX/TX
+		ILI9341_num18x34( 46, 103, 10, GREEN, MYFON); // RX
 	}
 	else {
-		ILI9341_WriteString( 46, 108, "T", Font_16x26, GREEN, MYFON); // RX/TX
+		ILI9341_num18x34( 46, 103, 11, RED, MYFON); // TX
 	}
-	Redraw_Band();    // Обновляем диапазон
-	Redraw_A_B();     // Обновляем A/B VFO
-	Redraw_mode();    // Перерисовываем модуляцию
-	Redraw_volume();  // Перерисовываем громкость
+
+	Redraw_Band();        // Обновляем диапазон
+	Redraw_A_B();         // Обновляем A/B VFO
+	Redraw_mode();        // Перерисовываем модуляцию
+	Redraw_volume();      // Перерисовываем громкость
+	Redraw_bandwidth();   // Перерисовываем полосу
+	
+	
+//	 
+//	ILI9341_Draw_Vertical_Line(46, 137+21, 20, GREEN);
+//	ILI9341_Draw_Horizontal_Line(46, 157+21, 80, GREEN); 
+//	ILI9341_Draw_Vertical_Line(46, 137+41+21, 20, GREEN);
+//	ILI9341_Draw_Horizontal_Line(46, 157+41+21, 80, GREEN); 
+//	ILI9341_Draw_Vertical_Line(144, 137+21, 20, GREEN);
+//	ILI9341_Draw_Horizontal_Line(144, 157+21, 80, GREEN);
 }
 
 void Redraw_Step(uint16_t step, uint8_t m_fl){ // Рисуем плашки под основной частотой
 	if(!m_fl){ // Если не в меню
-		ILI9341_Draw_Rectangle(63+16*5, 108+26, 16*6, 2, MYFON);
+		ILI9341_Draw_Rectangle(63+16*5, 108+30, 16*6, 2, MYFON);
 		switch (step) {
 			case 1: 
 				// 
-				ILI9341_Draw_Rectangle(63+16*10, 108+26, 16, 2, GREEN);
+				ILI9341_Draw_Rectangle(63+16*10, 108+30, 16, 2, GREEN);
 				break;
 			case 10: 
 				// 
-				ILI9341_Draw_Rectangle(63+16*9, 108+26, 16, 2, GREEN);
+				ILI9341_Draw_Rectangle(63+16*9, 108+30, 16, 2, GREEN);
 				break;
 			case 100: 
 				//
-				ILI9341_Draw_Rectangle(63+16*8, 108+26, 16, 2, GREEN);
+				ILI9341_Draw_Rectangle(63+16*8, 108+30, 16, 2, GREEN);
 				break;
 			case 1000: 
 				// 
-				ILI9341_Draw_Rectangle(63+16*6, 108+26, 16, 2, GREEN);
+				ILI9341_Draw_Rectangle(63+16*6, 108+30, 16, 2, GREEN);
 				break;
 			case 10000: 
 				// 
-				ILI9341_Draw_Rectangle(63+16*5, 108+26, 16, 2, GREEN);
+				ILI9341_Draw_Rectangle(63+16*5, 108+30, 16, 2, GREEN);
 				break;
 		}
 	}
 	else {
 		ILI9341_WriteString(   46, 240-18, "Step -", Font_11x18, GREEN, MYFON);
-		ILI9341_Draw_Menu_Var(152, 240-18, step);
+		ILI9341_Draw_Menu_Var(152, 240-18, 4, step);
 	}	
 }
