@@ -4,43 +4,43 @@
 #include "it.h"
 #include "main.h"
 
-//void SysTick_Setup(void);     // Настройка системного таймера
-void Clock_System_Init(void); // Инициализация системных таймеров и тактирования
-//void Clock_112MHz(void);       // Разгон
-void GPIO_Init(void);   	    // инициализация портов ввода вывода
-void SPI2_init(void);         // инициализация SPI
-void PWM2_Init(void);         // Инициализация шим
-void PWM3_Init(void);         // Инициализация шим
+//void SysTick_Setup(void);     // РќР°СЃС‚СЂРѕР№РєР° СЃРёСЃС‚РµРјРЅРѕРіРѕ С‚Р°Р№РјРµСЂР°
+void Clock_System_Init(void); // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ СЃРёСЃС‚РµРјРЅС‹С… С‚Р°Р№РјРµСЂРѕРІ Рё С‚Р°РєС‚РёСЂРѕРІР°РЅРёСЏ
+//void Clock_112MHz(void);       // Р Р°Р·РіРѕРЅ
+void GPIO_Init(void);   	    // РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РїРѕСЂС‚РѕРІ РІРІРѕРґР° РІС‹РІРѕРґР°
+void SPI2_init(void);         // РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ SPI
+void PWM2_Init(void);         // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ С€РёРј
+void PWM3_Init(void);          // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ С€РёРј
 void ADC_DMA_Init(void);
-void TIM4_Init(void);         // Инициализация таймера 4 для массивов КИХ(преобразования Гилберта и ФНЧ)
+void TIM4_Init(void);         // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ С‚Р°Р№РјРµСЂР° 4 РґР»СЏ РјР°СЃСЃРёРІРѕРІ РљРРҐ(РїСЂРµРѕР±СЂР°Р·РѕРІР°РЅРёСЏ Р“РёР»Р±РµСЂС‚Р° Рё Р¤РќР§)
 void SPI2_DMA_Init(void);
-void I2C1_Recover(void);      // перезапускаем зависший I2C
-void I2C1_Init(void);         // Инициализация I2C1
-void TIM1_Encoder_Init(void); // Инициализация энкодера
-void PWR_Init(void);          // Инициализация контроля питания
-void GPIO_Init_Buttons(void); // Инициализация кнопок
-void Update_Biquad_LPF(arm_biquad_casd_df1_inst_q31 *S, uint8_t stages, q31_t *coeffs_dest, const q31_t *coeffs_src, q31_t *state_buf); // Обновляем коэфициенты и переинициализируем
-void DSP_init(void);          // Инициализация функций библиотеки DSP
-void RX_Device_Inint(void);   // Инициализация ЦАП и АЦП на прием
-void TX_Device_Inint(void);   // Инициализация ЦАП и АЦП на передачу
-uint8_t Calculate_lpf_Q31(float cutOffFreq, float sampleRate, uint8_t *out_stages); // считаем коэффициенты ФНЧ для БИХ
+void I2C1_Recover(void);      // РїРµСЂРµР·Р°РїСѓСЃРєР°РµРј Р·Р°РІРёСЃС€РёР№ I2C
+void I2C1_Init(void);         // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ I2C1
+void TIM1_Encoder_Init(void); // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ СЌРЅРєРѕРґРµСЂР°
+void PWR_Init(void);          // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РєРѕРЅС‚СЂРѕР»СЏ РїРёС‚Р°РЅРёСЏ
+void GPIO_Init_Buttons(void); // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РєРЅРѕРїРѕРє
+void Update_Biquad_LPF(arm_biquad_casd_df1_inst_q31 *S, uint8_t stages, q31_t *coeffs_dest, const q31_t *coeffs_src, q31_t *state_buf); // РћР±РЅРѕРІР»СЏРµРј РєРѕСЌС„РёС†РёРµРЅС‚С‹ Рё РїРµСЂРµРёРЅРёС†РёР°Р»РёР·РёСЂСѓРµРј
+void DSP_init(void);          // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ С„СѓРЅРєС†РёР№ Р±РёР±Р»РёРѕС‚РµРєРё DSP
+void RX_Device_Inint(void);   // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ Р¦РђРџ Рё РђР¦Рџ РЅР° РїСЂРёРµРј
+void TX_Device_Inint(void);   // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ Р¦РђРџ Рё РђР¦Рџ РЅР° РїРµСЂРµРґР°С‡Сѓ
+uint8_t Calculate_lpf_Q31(float cutOffFreq, float sampleRate, uint8_t *out_stages); // СЃС‡РёС‚Р°РµРј РєРѕСЌС„С„РёС†РёРµРЅС‚С‹ Р¤РќР§ РґР»СЏ Р‘РРҐ
 
-void Calculate_Biquad4_Butterworth(float cutOffFreq, float sampleRate, biquad4_state_t *state);// Расчет коэфициентов для самописного биквада ФНЧ Баттерворта
+void Calculate_Biquad4_Butterworth(float cutOffFreq, float sampleRate, biquad4_state_t *state);// Р Р°СЃС‡РµС‚ РєРѕСЌС„РёС†РёРµРЅС‚РѕРІ РґР»СЏ СЃР°РјРѕРїРёСЃРЅРѕРіРѕ Р±РёРєРІР°РґР° Р¤РќР§ Р‘Р°С‚С‚РµСЂРІРѕСЂС‚Р°
 
-void calculate_lpf_coeffs_q15(q15_t *pCoeffs, float cutoff_freq); // Коеффициенты для КИХ ФНЧ
-void coeff_hilbert_init(void); // Считаем коэффициенты преобразования Гильберта h(n)
-void fast_hilbert_q15_custom(const arm_fir_instance_q15 *S, q15_t *pSrc, q15_t *pDst, uint32_t blockSize); // Своя реализация Гильберта
-void init_filters(void); // БИХ биквад для фазовращателя
-uint8_t Process_Encoder(int32_t *value, int32_t step, int32_t min_val, int32_t max_val); // Проверяем частоту
-void si5351_SetFrec(uint32_t frec); // Установка частоты si5351
-void Set_mode();               // Установка режима из конфига
-void Main_Scren_Init(void);    // Инициализация главного экрана
-void Redraw_A_B(void);         // Перерисовываем A/B VFO
-void Redraw_Band(void);        // Перерисовываем диапазон
-void Redraw_mode(void);        // Перерисовываем модуляцию
-void Redraw_volume(void);      // Перерисовываем громкость
-void Redraw_bandwidth(void);   // Перерисовываем полосу
-void Redraw_Main_Scr(void);    // Перерисовываем главный экран
-void Redraw_Step(uint16_t step, uint8_t m_fl); // Перерисовываем шаг для нормального режима и настроек
+void calculate_lpf_coeffs_q15(q15_t *pCoeffs, float cutoff_freq); // РљРѕРµС„С„РёС†РёРµРЅС‚С‹ РґР»СЏ РљРРҐ Р¤РќР§
+void coeff_hilbert_init(void); // РЎС‡РёС‚Р°РµРј РєРѕСЌС„С„РёС†РёРµРЅС‚С‹ РїСЂРµРѕР±СЂР°Р·РѕРІР°РЅРёСЏ Р“РёР»СЊР±РµСЂС‚Р° h(n)
+void fast_hilbert_q15_custom(const arm_fir_instance_q15 *S, q15_t *pSrc, q15_t *pDst, uint32_t blockSize); // РЎРІРѕСЏ СЂРµР°Р»РёР·Р°С†РёСЏ Р“РёР»СЊР±РµСЂС‚Р°
+void init_filters(void); // Р‘РРҐ Р±РёРєРІР°Рґ РґР»СЏ С„Р°Р·РѕРІСЂР°С‰Р°С‚РµР»СЏ
+uint8_t Process_Encoder(int32_t *value, int32_t step, int32_t min_val, int32_t max_val); // РџСЂРѕРІРµСЂСЏРµРј С‡Р°СЃС‚РѕС‚Сѓ
+void si5351_SetFrec(uint32_t frec); // РЈСЃС‚Р°РЅРѕРІРєР° С‡Р°СЃС‚РѕС‚С‹ si5351
+void Set_mode();               // РЈСЃС‚Р°РЅРѕРІРєР° СЂРµР¶РёРјР° РёР· РєРѕРЅС„РёРіР°
+void Main_Scren_Init(void);    // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РіР»Р°РІРЅРѕРіРѕ СЌРєСЂР°РЅР°
+void Redraw_A_B(void);         // РџРµСЂРµСЂРёСЃРѕРІС‹РІР°РµРј A/B VFO
+void Redraw_Band(void);        // РџРµСЂРµСЂРёСЃРѕРІС‹РІР°РµРј РґРёР°РїР°Р·РѕРЅ
+void Redraw_mode(void);        // РџРµСЂРµСЂРёСЃРѕРІС‹РІР°РµРј РјРѕРґСѓР»СЏС†РёСЋ
+void Redraw_volume(void);      // РџРµСЂРµСЂРёСЃРѕРІС‹РІР°РµРј РіСЂРѕРјРєРѕСЃС‚СЊ
+void Redraw_bandwidth(void);   // РџРµСЂРµСЂРёСЃРѕРІС‹РІР°РµРј РїРѕР»РѕСЃСѓ
+void Redraw_Main_Scr(void);    // РџРµСЂРµСЂРёСЃРѕРІС‹РІР°РµРј РіР»Р°РІРЅС‹Р№ СЌРєСЂР°РЅ
+void Redraw_Step(uint16_t step, uint8_t m_fl); // РџРµСЂРµСЂРёСЃРѕРІС‹РІР°РµРј С€Р°Рі РґР»СЏ РЅРѕСЂРјР°Р»СЊРЅРѕРіРѕ СЂРµР¶РёРјР° Рё РЅР°СЃС‚СЂРѕРµРє
 
 #endif

@@ -1,10 +1,10 @@
 #include "config.h"
 
 
-// текущее состояние трансивера, оперативное
+//  С‚РµРєСѓС‰РµРµ СЃРѕСЃС‚РѕСЏРЅРёРµ С‚СЂР°РЅСЃРёРІРµСЂР°, РѕРїРµСЂР°С‚РёРІРЅРѕРµ
 trx_state_t trx_state =  
 {
-    .version        = TRX_STATE_VERSION,
+    .version         = TRX_STATE_VERSION,
 
     .vfo_a_freq =
     {
@@ -63,15 +63,15 @@ trx_state_t trx_state =
 
 trx_state_f trx_state_flag =  
 {
-		.volume_enabled = 0,   // Флаг регулировки громкости 
-    .bandwidth_enabled = 0   // Флаг регулировки полосы
+		.volume_enabled = 0,   // Р¤Р»Р°Рі СЂРµРіСѓР»РёСЂРѕРІРєРё РіСЂРѕРјРєРѕСЃС‚Рё 
+    .bandwidth_enabled = 0   // Р¤Р»Р°Рі СЂРµРіСѓР»РёСЂРѕРІРєРё РїРѕР»РѕСЃС‹
 };
 
-// Указатель на место во Flash, где была найдена последняя рабочая запись
+// РЈРєР°Р·Р°С‚РµР»СЊ РЅР° РјРµСЃС‚Рѕ РІРѕ Flash, РіРґРµ Р±С‹Р»Р° РЅР°Р№РґРµРЅР° РїРѕСЃР»РµРґРЅСЏСЏ СЂР°Р±РѕС‡Р°СЏ Р·Р°РїРёСЃСЊ
 static const trx_state_t* last_valid_flash_state = NULL;
 
 /**
-  * @brief  Разблокировка контроллера Flash и сброс ошибок
+  * @brief  Р Р°Р·Р±Р»РѕРєРёСЂРѕРІРєР° РєРѕРЅС‚СЂРѕР»Р»РµСЂР° Flash Рё СЃР±СЂРѕСЃ РѕС€РёР±РѕРє
   */
 void Flash_Unlock(void) {
     if ((FLASH->CR & FLASH_CR_LOCK) != 0) {
@@ -82,14 +82,14 @@ void Flash_Unlock(void) {
 }
 
 /**
-  * @brief  Блокировка контроллера Flash
+  * @brief  Р‘Р»РѕРєРёСЂРѕРІРєР° РєРѕРЅС‚СЂРѕР»Р»РµСЂР° Flash
   */
 void Flash_Lock(void) {
     FLASH->CR |= FLASH_CR_LOCK;
 }
 
 /**
-  * @brief  Стирание одной страницы Flash
+  * @brief  РЎС‚РёСЂР°РЅРёРµ РѕРґРЅРѕР№ СЃС‚СЂР°РЅРёС†С‹ Flash
   */
 void Flash_ErasePage(uint32_t page_addr) {
     while ((FLASH->SR & FLASH_SR_BSY) != 0); 
@@ -101,7 +101,7 @@ void Flash_ErasePage(uint32_t page_addr) {
 }
 
 /**
-  * @brief  Быстрая запись во Flash с контролем успешности "на лету"
+  * @brief  Р‘С‹СЃС‚СЂР°СЏ Р·Р°РїРёСЃСЊ РІРѕ Flash СЃ РєРѕРЅС‚СЂРѕР»РµРј СѓСЃРїРµС€РЅРѕСЃС‚Рё "РЅР° Р»РµС‚Сѓ"
   */
 bool Flash_WriteStruct(uint32_t dest_addr, const trx_state_t* src) {
     FLASH->CR |= FLASH_CR_PG; 
@@ -116,7 +116,7 @@ bool Flash_WriteStruct(uint32_t dest_addr, const trx_state_t* src) {
         dest_ptr[i] = src_ptr[i]; 
 		  	while (FLASH->SR & FLASH_SR_BSY);
         
-        // Мгновенная верификация записанного полуслова
+        // РњРіРЅРѕРІРµРЅРЅР°СЏ РІРµСЂРёС„РёРєР°С†РёСЏ Р·Р°РїРёСЃР°РЅРЅРѕРіРѕ РїРѕР»СѓСЃР»РѕРІР°
         if (dest_ptr[i] != src_ptr[i]) {
             success = false; 
             break; 
@@ -130,7 +130,7 @@ bool Flash_WriteStruct(uint32_t dest_addr, const trx_state_t* src) {
 }
 
 /**
-  * @brief  Сохранение состояния. Вызывается ИСКЛЮЧИТЕЛЬНО из PVD_IRQHandler.
+  * @brief  РЎРѕС…СЂР°РЅРµРЅРёРµ СЃРѕСЃС‚РѕСЏРЅРёСЏ. Р’С‹Р·С‹РІР°РµС‚СЃСЏ РРЎРљР›Р®Р§РРўР•Р›Р¬РќРћ РёР· PVD_IRQHandler.
   */
 void TRX_State_Save(void) {
     uint32_t target_addr = 0;
@@ -155,7 +155,7 @@ void TRX_State_Save(void) {
     }
     
     if (target_addr != 0) {
-        // Разблокируем Flash, пишем и НЕ тратим время на Flash_Lock(), так как МК сейчас отключится
+        // Р Р°Р·Р±Р»РѕРєРёСЂСѓРµРј Flash, РїРёС€РµРј Рё РќР• С‚СЂР°С‚РёРј РІСЂРµРјСЏ РЅР° Flash_Lock(), С‚Р°Рє РєР°Рє РњРљ СЃРµР№С‡Р°СЃ РѕС‚РєР»СЋС‡РёС‚СЃСЏ
         Flash_Unlock();
         if (Flash_WriteStruct(target_addr, &trx_state)) {
             last_valid_flash_state = (const trx_state_t*)target_addr;
@@ -164,7 +164,7 @@ void TRX_State_Save(void) {
 }
 
 /**
-  * @brief  Загрузка состояния при старте МК + безопасный перенос страниц.
+  * @brief  Р—Р°РіСЂСѓР·РєР° СЃРѕСЃС‚РѕСЏРЅРёСЏ РїСЂРё СЃС‚Р°СЂС‚Рµ РњРљ + Р±РµР·РѕРїР°СЃРЅС‹Р№ РїРµСЂРµРЅРѕСЃ СЃС‚СЂР°РЅРёС†.
   */
 void TRX_State_Load(void) {
     const trx_state_t* best_record = NULL;
@@ -173,7 +173,7 @@ void TRX_State_Load(void) {
     
     FLASH->SR |= FLASH_SR_EOP | FLASH_SR_PGERR | FLASH_SR_WRPRTERR;
     
-    // 1. Линейный обход страниц
+    // 1. Р›РёРЅРµР№РЅС‹Р№ РѕР±С…РѕРґ СЃС‚СЂР°РЅРёС†
     for (int p = 0; p < 2; p++) {
         uint32_t page_end = pages[p] + FLASH_PAGE_SIZE;
         
@@ -189,17 +189,17 @@ void TRX_State_Load(void) {
         }
     }
     
-    // 2. Копируем в RAM, если нашли
+    // 2. РљРѕРїРёСЂСѓРµРј РІ RAM, РµСЃР»Рё РЅР°С€Р»Рё
     if (best_record != NULL) {
         trx_state = *best_record;
         last_valid_flash_state = best_record;
     } else {
-        // Дефолтные настройки для чистой памяти
-        // уже есть ничего не делаем выходим
+        // Р”РµС„РѕР»С‚РЅС‹Рµ РЅР°СЃС‚СЂРѕР№РєРё РґР»СЏ С‡РёСЃС‚РѕР№ РїР°РјСЏС‚Рё
+        // СѓР¶Рµ РµСЃС‚СЊ РЅРёС‡РµРіРѕ РЅРµ РґРµР»Р°РµРј РІС‹С…РѕРґРёРј
         return; 
     }
     
-    // 3. Обслуживание кольцевого буфера при старте
+    // 3. РћР±СЃР»СѓР¶РёРІР°РЅРёРµ РєРѕР»СЊС†РµРІРѕРіРѕ Р±СѓС„РµСЂР° РїСЂРё СЃС‚Р°СЂС‚Рµ
     uint32_t current_page = (uint32_t)last_valid_flash_state & ~(FLASH_PAGE_SIZE - 1);
     uint32_t next_record_addr = (uint32_t)last_valid_flash_state + sizeof(trx_state_t);
     
@@ -209,11 +209,11 @@ void TRX_State_Load(void) {
         Flash_Unlock();
         Flash_ErasePage(other_page);
         
-        // ПУНКТ 2: Двойная проверка — сначала проверяем успешность выполнения функции записи
+        // РџРЈРќРљРў 2: Р”РІРѕР№РЅР°СЏ РїСЂРѕРІРµСЂРєР° вЂ” СЃРЅР°С‡Р°Р»Р° РїСЂРѕРІРµСЂСЏРµРј СѓСЃРїРµС€РЅРѕСЃС‚СЊ РІС‹РїРѕР»РЅРµРЅРёСЏ С„СѓРЅРєС†РёРё Р·Р°РїРёСЃРё
         if (Flash_WriteStruct(other_page, &trx_state)) {
             const trx_state_t *rec = (const trx_state_t *)other_page;
             
-            // Затем физически верифицируем критические заголовки в самой памяти Flash
+            // Р—Р°С‚РµРј С„РёР·РёС‡РµСЃРєРё РІРµСЂРёС„РёС†РёСЂСѓРµРј РєСЂРёС‚РёС‡РµСЃРєРёРµ Р·Р°РіРѕР»РѕРІРєРё РІ СЃР°РјРѕР№ РїР°РјСЏС‚Рё Flash
             if (rec->magic == TRX_STATE_MAGIC && 
                 rec->version == TRX_STATE_VERSION && 
                 rec->counter == trx_state.counter) 
@@ -223,10 +223,10 @@ void TRX_State_Load(void) {
             }
         }
         
-        // ПУНКТ 1: Обязательно блокируем Flash. Программа переходит к основному циклу
+        // РџРЈРќРљРў 1: РћР±СЏР·Р°С‚РµР»СЊРЅРѕ Р±Р»РѕРєРёСЂСѓРµРј Flash. РџСЂРѕРіСЂР°РјРјР° РїРµСЂРµС…РѕРґРёС‚ Рє РѕСЃРЅРѕРІРЅРѕРјСѓ С†РёРєР»Сѓ
         Flash_Lock();
     } else {
-        // Если перенос страниц не требовался, всё равно принудительно закрываем Flash
+        // Р•СЃР»Рё РїРµСЂРµРЅРѕСЃ СЃС‚СЂР°РЅРёС† РЅРµ С‚СЂРµР±РѕРІР°Р»СЃСЏ, РІСЃС‘ СЂР°РІРЅРѕ РїСЂРёРЅСѓРґРёС‚РµР»СЊРЅРѕ Р·Р°РєСЂС‹РІР°РµРј Flash
         Flash_Lock();
     }
 }

@@ -7,53 +7,53 @@
 //#include "ILI9341_GFX.h"
 
 
-#define FLASH_PAGE_SIZE         1024U          // Размер страницы Flash STM32F103
+#define FLASH_PAGE_SIZE         1024U          // Р Р°Р·РјРµСЂ СЃС‚СЂР°РЅРёС†С‹ Flash STM32F103
 
-//// Адреса страниц для Состояния (State) Мертвые
+//// РђРґСЂРµСЃР° СЃС‚СЂР°РЅРёС† РґР»СЏ  РЎРѕСЃС‚РѕСЏРЅРёСЏ (State) РњРµСЂС‚РІС‹Рµ
 //#define TRX_STATE_PAGE0         0x0800F000UL
 //#define TRX_STATE_PAGE1         0x0800F400UL
-//// Адреса страниц для Состояния (State) — Конец 64 КБ
-#define TRX_STATE_PAGE0         0x0800F800UL  // Страница 62
-#define TRX_STATE_PAGE1         0x0800FC00UL  // Страница 63 (Последняя)
+//// РђРґСЂРµСЃР° СЃС‚СЂР°РЅРёС† РґР»СЏ РЎРѕСЃС‚РѕСЏРЅРёСЏ (State) вЂ” РљРѕРЅРµС† 64 РљР‘
+#define TRX_STATE_PAGE0         0x0800F800UL  // РЎС‚СЂР°РЅРёС†Р° 62
+#define TRX_STATE_PAGE1         0x0800FC00UL   // РЎС‚СЂР°РЅРёС†Р° 63 (РџРѕСЃР»РµРґРЅСЏСЏ)
 
-#define TRX_STATE_VERSION       3             // Менять, если структура изменится
-#define TRX_STATE_MAGIC         0x54525853UL  // Сигнатура "TRXS"
+#define TRX_STATE_VERSION       3             // РњРµРЅСЏС‚СЊ, РµСЃР»Рё СЃС‚СЂСѓРєС‚СѓСЂР° РёР·РјРµРЅРёС‚СЃСЏ
+#define TRX_STATE_MAGIC         0x54525853UL  // РЎРёРіРЅР°С‚СѓСЂР° "TRXS"
 
 		
 typedef struct                        
 {
-    uint32_t magic;                   // Сигнатура записи
-    uint32_t counter;                 // Инкрементный счетчик записей
-    uint16_t version;                 // Версия структуры
+    uint32_t magic;                   // РЎРёРіРЅР°С‚СѓСЂР° Р·Р°РїРёСЃРё
+    uint32_t counter;                 // РРЅРєСЂРµРјРµРЅС‚РЅС‹Р№ СЃС‡РµС‚С‡РёРє Р·Р°РїРёСЃРµР№
+    uint16_t version;                 // Р’РµСЂСЃРёСЏ СЃС‚СЂСѓРєС‚СѓСЂС‹
 
-    uint32_t vfo_a_freq[9];           // Массив частот VFO A для 9 диапазонов
-    uint32_t vfo_b_freq[9];           // Массив частот VFO B для 9 диапазонов
+    uint32_t vfo_a_freq[9];           // РњР°СЃСЃРёРІ С‡Р°СЃС‚РѕС‚ VFO A РґР»СЏ 9 РґРёР°РїР°Р·РѕРЅРѕРІ
+    uint32_t vfo_b_freq[9];           // РњР°СЃСЃРёРІ С‡Р°СЃС‚РѕС‚ VFO B РґР»СЏ 9 РґРёР°РїР°Р·РѕРЅРѕРІ
 
-    uint8_t  band_att_pre[9];         // Аттенюатор/УВЧ для 9 диапазонов
-  	uint8_t  band_mode_a[9];          // Модуляция VFO A для 9 диапазонов (0:SW 1:LSB 2:USB 3:AM 4:FM)
-    uint8_t  band_mode_b[9];          // Модуляция VFO B для 9 диапазонов
+    uint8_t  band_att_pre[9];         // РђС‚С‚РµРЅСЋР°С‚РѕСЂ/РЈР’Р§ РґР»СЏ 9 РґРёР°РїР°Р·РѕРЅРѕРІ
+  	uint8_t  band_mode_a[9];          // РњРѕРґСѓР»СЏС†РёСЏ VFO A РґР»СЏ 9 РґРёР°РїР°Р·РѕРЅРѕРІ (0:SW 1:LSB 2:USB 3:AM 4:FM)
+    uint8_t  band_mode_b[9];          // РњРѕРґСѓР»СЏС†РёСЏ VFO B РґР»СЏ 9 РґРёР°РїР°Р·РѕРЅРѕРІ
 
-    uint8_t  current_band;            // Текущий диапазон
-    uint8_t  active_vfo;              // Активный VFO (0=A, 1=B)
+    uint8_t  current_band;            // РўРµРєСѓС‰РёР№ РґРёР°РїР°Р·РѕРЅ
+    uint8_t  active_vfo;              // РђРєС‚РёРІРЅС‹Р№ VFO (0=A, 1=B)
 
-    uint16_t tuning_step;             // Шаг перестройки (Hz)
-    int16_t  rit_offset;              // Расстройка приемника (Hz)
-    int16_t  xit_offset;              // Расстройка передатчика (Hz)
+    uint16_t tuning_step;             // РЁР°Рі РїРµСЂРµСЃС‚СЂРѕР№РєРё (Hz)
+    int16_t  rit_offset;              // Р Р°СЃСЃС‚СЂРѕР№РєР° РїСЂРёРµРјРЅРёРєР° (Hz)
+    int16_t  xit_offset;              // Р Р°СЃСЃС‚СЂРѕР№РєР° РїРµСЂРµРґР°С‚С‡РёРєР° (Hz)
 
-    uint8_t  rit_enabled;             // Флаг включения RIT
-    uint8_t  xit_enabled;             // Флаг включения XIT
+    uint8_t  rit_enabled;             // Р¤Р»Р°Рі РІРєР»СЋС‡РµРЅРёСЏ RIT
+    uint8_t  xit_enabled;             // Р¤Р»Р°Рі РІРєР»СЋС‡РµРЅРёСЏ XIT
 	
-	  uint8_t  volume;                  // Громкость
-} trx_state_t;                        // Состояние трансивера
+	  uint8_t  volume;                  // Р“СЂРѕРјРєРѕСЃС‚СЊ
+} trx_state_t;                        // РЎРѕСЃС‚РѕСЏРЅРёРµ С‚СЂР°РЅСЃРёРІРµСЂР°
 
-typedef struct                        // Состояние трансивера
+typedef struct                        // РЎРѕСЃС‚РѕСЏРЅРёРµ С‚СЂР°РЅСЃРёРІРµСЂР°
 {
-    uint8_t  volume_enabled;          // Флаг регулировки громкости
-	  uint8_t  bandwidth_enabled;       // Флаг регулировки полосы
-} trx_state_f;                        // Флаги состояния трансивера
+    uint8_t  volume_enabled;          // Р¤Р»Р°Рі СЂРµРіСѓР»РёСЂРѕРІРєРё РіСЂРѕРјРєРѕСЃС‚Рё
+	  uint8_t  bandwidth_enabled;       // Р¤Р»Р°Рі СЂРµРіСѓР»РёСЂРѕРІРєРё РїРѕР»РѕСЃС‹
+} trx_state_f;                        // Р¤Р»Р°РіРё СЃРѕСЃС‚РѕСЏРЅРёСЏ С‚СЂР°РЅСЃРёРІРµСЂР°
 
 
-// S зависимось
+// S Р·Р°РІРёСЃРёРјРѕСЃСЊ
 static const q15_t volume_lut_100[101] = {
     0,     41,    102,   182,   283,   402,   539,   695,   867,   1057,
     1263,  1485,  1721,  1972,  2236,  2514,  2803,  3105,  3417,  3740,
@@ -69,11 +69,11 @@ static const q15_t volume_lut_100[101] = {
 };
 
 
-//  Регулировка уровня
+//  Р РµРіСѓР»РёСЂРѕРІРєР° СѓСЂРѕРІРЅСЏ
 __STATIC_FORCEINLINE q15_t apply_gain(q15_t sample, uint8_t step) {
     return (q15_t)(((int32_t)sample * volume_lut_100[step]) >> 15);
 }
-void TRX_State_Save(void);  // сохранение текшего состояния трансивера
-void TRX_State_Load(void);  // загрузка текшего состояния трансивера
+void TRX_State_Save(void);  // СЃРѕС…СЂР°РЅРµРЅРёРµ С‚РµРєС€РµРіРѕ СЃРѕСЃС‚РѕСЏРЅРёСЏ С‚СЂР°РЅСЃРёРІРµСЂР°
+void TRX_State_Load(void);  // Р·Р°РіСЂСѓР·РєР° С‚РµРєС€РµРіРѕ СЃРѕСЃС‚РѕСЏРЅРёСЏ С‚СЂР°РЅСЃРёРІРµСЂР°
 
 #endif

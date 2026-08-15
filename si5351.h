@@ -21,7 +21,7 @@ typedef enum {
 } si5351RDiv_t;
 
 typedef enum {
-    SI5351_DRIVE_STRENGTH_2MA = 0x00, //  ~ 2.2 dBm
+    SI5351_DRIVE_STRENGTH_2MA = 0x00,  //  ~ 2.2 dBm
     SI5351_DRIVE_STRENGTH_4MA = 0x01, //  ~ 7.5 dBm
     SI5351_DRIVE_STRENGTH_6MA = 0x02, //  ~ 9.5 dBm
     SI5351_DRIVE_STRENGTH_8MA = 0x03, // ~ 10.7 dBm
@@ -58,7 +58,7 @@ void si5351_EnableOutputs(uint8_t enabled);
  * Advanced interface. Use it if you need:
  *
  * a. CLK0, CLK1 and CLK2 simultaneously;
- * b. A phase shift 90° between two channels;
+ * b. A phase shift 90В° between two channels;
  *
  * si5351_Calc() always uses 900 MHz PLL for frequencies below 81 MHz.
  * This PLL can safely be shared between all CLKx that work @ <= 81 MHz.
@@ -68,7 +68,7 @@ void si5351_EnableOutputs(uint8_t enabled);
 void si5351_Calc(int32_t Fclk, si5351PLLConfig_t* pll_conf, si5351OutputConfig_t* out_conf);
 
 /*
- * si5351_CalcIQ() finds PLL and MS parameters that give phase shift 90° between two channels,
+ * si5351_CalcIQ() finds PLL and MS parameters that give phase shift 90В° between two channels,
  * if 0 and (uint8_t)out_conf.div are passed as phaseOffset for these channels. Channels should
  * use the same PLL to make it work.
  */

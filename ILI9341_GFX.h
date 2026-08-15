@@ -1,7 +1,7 @@
 
 
 #ifndef ILI9341_GFX_H
-#define ILI9341_GFX_H
+#define  ILI9341_GFX_H
 
 #include "main.h"
 #include "fonts.h"
@@ -12,8 +12,8 @@
 #define DISP_SPI         SPI2
 #define SPI1_DR_8bit  (*(__IO uint8_t *)((uint32_t)&(SPI2->DR))) 
 
-////////////////////////////////////// настройка пинов /////////////////////////////////////
-// чип селект CS активный уровень низкий
+////////////////////////////////////// РЅР°СЃС‚СЂРѕР№РєР° РїРёРЅРѕРІ /////////////////////////////////////
+// С‡РёРї СЃРµР»РµРєС‚ CS Р°РєС‚РёРІРЅС‹Р№ СѓСЂРѕРІРµРЅСЊ РЅРёР·РєРёР№
 #define DISP_CS_SELECT      GPIOA->BRR = GPIO_BSRR_BS12  //HAL_GPIO_WritePin(TFT_CS_GPIO_Port, TFT_CS_Pin, GPIO_PIN_RESET)
 #define DISP_CS_UNSELECT    GPIOA->BSRR = GPIO_BSRR_BS12  //HAL_GPIO_WritePin(TFT_CS_GPIO_Port, TFT_CS_Pin, GPIO_PIN_SET)
 
@@ -23,15 +23,15 @@
 #define DISP_RST_RESET      GPIOA->BRR = GPIO_BSRR_BS11  //HAL_GPIO_WritePin(TFT_RST_GPIO_Port, TFT_RST_Pin, GPIO_PIN_RESET)
 #define DISP_RST_WORK       GPIOA->BSRR = GPIO_BSRR_BS11  //HAL_GPIO_WritePin(TFT_RST_GPIO_Port, TFT_RST_Pin, GPIO_PIN_SET)
 
-///////////////// ширина высота ///////////////////
+///////////////// С€РёСЂРёРЅР° РІС‹СЃРѕС‚Р° ///////////////////
 #define ILI9341_SCREEN_WIDTH 	320
 #define ILI9341_SCREEN_HEIGHT   240
 
-// команды
+// РєРѕРјР°РЅРґС‹
 #define ILI9341_VSCRSADD 0x37 ///< Vertical Scrolling Start Address
 #define ILI9341_VSCRDEF 0x33  ///< Vertical Scrolling Definition
 
-// различные цвета, создать нужный можно здесь https://trolsoft.ru/ru/articles/rgb565-color-picker
+// СЂР°Р·Р»РёС‡РЅС‹Рµ С†РІРµС‚Р°, СЃРѕР·РґР°С‚СЊ РЅСѓР¶РЅС‹Р№ РјРѕР¶РЅРѕ Р·РґРµСЃСЊ https://trolsoft.ru/ru/articles/rgb565-color-picker
 //                     -----______-----
 #define MYFON        0b0000000000000000  // #------
 #define TEXTCL       0b0000011111100000  // #------
@@ -81,18 +81,18 @@ void ILI9341_Set_Scroll_Margins(uint16_t Top, uint16_t Bottom);
 
 void ILI9341_Draw_Rectangle(uint16_t X, uint16_t Y, uint16_t Width, uint16_t Height, uint16_t Colour);
 void ILI9341_Draw_Horizontal_Line(uint16_t X, uint16_t Y, uint16_t Width, uint16_t Colour);
-// отрисовываем интерфейс
-void apply_smoothing(q15_t* new_mag); // усреднение водопада
-void ILI9341_Draw_Waterfall(uint16_t* data); // водопад FFT
+// РѕС‚СЂРёСЃРѕРІС‹РІР°РµРј РёРЅС‚РµСЂС„РµР№СЃ
+void apply_smoothing(q15_t* new_mag); // СѓСЃСЂРµРґРЅРµРЅРёРµ РІРѕРґРѕРїР°РґР°
+void ILI9341_Draw_Waterfall(uint16_t* data); // РІРѕРґРѕРїР°Рґ FFT
 void ILI9341_num18x34(uint16_t x, uint16_t y, uint8_t ch, uint16_t color, uint16_t bgcolor);
-void ILI9341_Draw_MainFrec(uint16_t x, uint16_t y, uint32_t freq); // Выводим основную частоту
-void ILI9341_Draw_Frec11x18(uint16_t x, uint16_t y, uint32_t freq);  // рисуем частоту маленьким шрифтом
-void format_freq(uint32_t f, char *out); // Число в частоту
-void format_var(int32_t f, char *out); // Число в строку
-void ILI9341_Draw_Menu_Var(uint16_t x, uint16_t y, uint8_t leng, int32_t var); // Рисуем переменные в меню
-void ILI9341_Draw_Scale();// рисуем шкалу рядом с водопадом
-void Draw_SMeter_Labels(int16_t analog_gain_db, uint16_t bar_right_x); // Рисуем шкалу s-метра
-void ILI9341_Draw_Smetr(q15_t value); // водопад полосу s-метра
+void ILI9341_Draw_MainFrec(uint16_t x, uint16_t y, uint32_t freq); // Р’С‹РІРѕРґРёРј РѕСЃРЅРѕРІРЅСѓСЋ С‡Р°СЃС‚РѕС‚Сѓ
+void ILI9341_Draw_Frec11x18(uint16_t x, uint16_t y, uint32_t freq);  // СЂРёСЃСѓРµРј С‡Р°СЃС‚РѕС‚Сѓ РјР°Р»РµРЅСЊРєРёРј С€СЂРёС„С‚РѕРј
+void format_freq(uint32_t f, char *out); // Р§РёСЃР»Рѕ РІ С‡Р°СЃС‚РѕС‚Сѓ
+void format_var(int32_t f, char *out); // Р§РёСЃР»Рѕ РІ СЃС‚СЂРѕРєСѓ
+void ILI9341_Draw_Menu_Var(uint16_t x, uint16_t y, uint8_t leng, int32_t var); // Р РёСЃСѓРµРј РїРµСЂРµРјРµРЅРЅС‹Рµ РІ РјРµРЅСЋ
+void ILI9341_Draw_Scale();// СЂРёСЃСѓРµРј С€РєР°Р»Сѓ СЂСЏРґРѕРј СЃ РІРѕРґРѕРїР°РґРѕРј
+void Draw_SMeter_Labels(int16_t analog_gain_db, uint16_t bar_right_x); // Р РёСЃСѓРµРј С€РєР°Р»Сѓ s-РјРµС‚СЂР°
+void ILI9341_Draw_Smetr(q15_t value); // РІРѕРґРѕРїР°Рґ РїРѕР»РѕСЃСѓ s-РјРµС‚СЂР°
 
 void ILI9341_Draw_Vertical_Line(uint16_t X, uint16_t Y, uint16_t Height, uint16_t Colour);
 void ILI9341_Draw_Hollow_Circle(uint16_t X, uint16_t Y, uint16_t Radius, uint16_t Colour);

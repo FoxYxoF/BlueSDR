@@ -4,8 +4,8 @@
 #define SI5351_ADDRESS 0x60
 //#define I2C_HANDLE hi2c1
 
-#define I2C_FAST_TIMEOUT   2000UL // Короткий таймаут для быстрых циклов (при 72МГц это ~10-15 мкс)
-#define I2C_LONG_TIMEOUT  20000UL // Длинный таймаут для ожидания окончания передачи байта
+#define I2C_FAST_TIMEOUT   2000UL //  РљРѕСЂРѕС‚РєРёР№ С‚Р°Р№РјР°СѓС‚ РґР»СЏ Р±С‹СЃС‚СЂС‹С… С†РёРєР»РѕРІ (РїСЂРё 72РњР“С† СЌС‚Рѕ ~10-15 РјРєСЃ)
+#define I2C_LONG_TIMEOUT  20000UL // Р”Р»РёРЅРЅС‹Р№ С‚Р°Р№РјР°СѓС‚ РґР»СЏ РѕР¶РёРґР°РЅРёСЏ РѕРєРѕРЅС‡Р°РЅРёСЏ РїРµСЂРµРґР°С‡Рё Р±Р°Р№С‚Р°
 
 // Private procedures.
                  // Device header
@@ -289,7 +289,7 @@ void si5351_Calc(int32_t Fclk, si5351PLLConfig_t* pll_conf, si5351OutputConfig_t
     out_conf->denom = z;
 }
 
-// si5351_CalcIQ() finds PLL and MS parameters that give phase shift 90° between two channels,
+// si5351_CalcIQ() finds PLL and MS parameters that give phase shift 90В° between two channels,
 // if 0 and (uint8_t)out_conf.div are passed as phaseOffset for these channels. Channels should
 // use the same PLL to make it work. Fclk can be from 1.4 MHz to 100 MHz. The actual frequency will
 // differ less than 4 Hz from given Fclk, assuming `correction` is right.
@@ -360,61 +360,61 @@ void si5351_EnableOutputs(uint8_t enabled) {
 
 // Writes an 8 bit value of a register over I2C.
 /*void si5351_write(uint8_t reg, uint8_t value) {
-     // 1. Ждем, пока шина освободится
+     // 1. Р–РґРµРј, РїРѕРєР° С€РёРЅР° РѕСЃРІРѕР±РѕРґРёС‚СЃСЏ
     while (I2C1->SR2 & I2C_SR2_BUSY);
 
-    // 2. Генерируем START
+    // 2. Р“РµРЅРµСЂРёСЂСѓРµРј START
     I2C1->CR1 |= I2C_CR1_START;
-    while (!(I2C1->SR1 & I2C_SR1_SB)); // Ждем завершения Start
+    while (!(I2C1->SR1 & I2C_SR1_SB)); // Р–РґРµРј Р·Р°РІРµСЂС€РµРЅРёСЏ Start
 
-    // 3. Посылаем адрес устройства (SI5351_ADDRESS << 1) + 0 (Write)
+    // 3. РџРѕСЃС‹Р»Р°РµРј Р°РґСЂРµСЃ СѓСЃС‚СЂРѕР№СЃС‚РІР° (SI5351_ADDRESS << 1) + 0 (Write)
     I2C1->DR = (SI5351_ADDRESS << 1); 
-    while (!(I2C1->SR1 & I2C_SR1_ADDR)); // Ждем подтверждения адреса
-    (void)I2C1->SR2; // Очистка флага ADDR чтением SR2
+    while (!(I2C1->SR1 & I2C_SR1_ADDR)); // Р–РґРµРј РїРѕРґС‚РІРµСЂР¶РґРµРЅРёСЏ Р°РґСЂРµСЃР°
+    (void)I2C1->SR2; // РћС‡РёСЃС‚РєР° С„Р»Р°РіР° ADDR С‡С‚РµРЅРёРµРј SR2
 
-    // 4. Посылаем номер регистра
+    // 4. РџРѕСЃС‹Р»Р°РµРј РЅРѕРјРµСЂ СЂРµРіРёСЃС‚СЂР°
     I2C1->DR = reg;
-    while (!(I2C1->SR1 & I2C_SR1_TXE)); // Ждем пустого буфера
+    while (!(I2C1->SR1 & I2C_SR1_TXE)); // Р–РґРµРј РїСѓСЃС‚РѕРіРѕ Р±СѓС„РµСЂР°
 
-    // 5. Посылаем значение
+    // 5. РџРѕСЃС‹Р»Р°РµРј Р·РЅР°С‡РµРЅРёРµ
     I2C1->DR = value;
-    while (!(I2C1->SR1 & I2C_SR1_TXE) || !(I2C1->SR1 & I2C_SR1_BTF)); // Ждем окончания передачи
+    while (!(I2C1->SR1 & I2C_SR1_TXE) || !(I2C1->SR1 & I2C_SR1_BTF)); // Р–РґРµРј РѕРєРѕРЅС‡Р°РЅРёСЏ РїРµСЂРµРґР°С‡Рё
 
-    // 6. Генерируем STOP
+    // 6. Р“РµРЅРµСЂРёСЂСѓРµРј STOP
     I2C1->CR1 |= I2C_CR1_STOP;
 } */
 
-// Функция аварийного сброса модуля I2C1 при физическом отключении ведомого
+// Р¤СѓРЅРєС†РёСЏ Р°РІР°СЂРёР№РЅРѕРіРѕ СЃР±СЂРѕСЃР° РјРѕРґСѓР»СЏ I2C1 РїСЂРё С„РёР·РёС‡РµСЃРєРѕРј РѕС‚РєР»СЋС‡РµРЅРёРё РІРµРґРѕРјРѕРіРѕ
 static void I2C1_ForceReset(void) {
     I2C1->CR1 |= I2C_CR1_SWRST;
     __NOP();
     I2C1->CR1 &= ~I2C_CR1_SWRST;
     
-    // ВАЖНО: После SWRST регистры I2C сбрасываются в 0!
-    // Здесь необходимо заново прописать ваши настройки скорости 400 кГц.
-    // Пример для APB1 = 36 МГц (Fast Mode, duty cycle 2):
-    I2C1->CR2   = 36;          // Частота APB1 периферии
-    I2C1->CCR   = 30;          // 400 кГц (36000000 / (3 * 400000))
-    I2C1->TRISE = 12;          // Максимальное время нарастания для Fast Mode
-    I2C1->CR1  |= I2C_CR1_PE;  // Включаем периферию обратно
+    // Р’РђР–РќРћ: РџРѕСЃР»Рµ SWRST СЂРµРіРёСЃС‚СЂС‹ I2C СЃР±СЂР°СЃС‹РІР°СЋС‚СЃСЏ РІ 0!
+    // Р—РґРµСЃСЊ РЅРµРѕР±С…РѕРґРёРјРѕ Р·Р°РЅРѕРІРѕ РїСЂРѕРїРёСЃР°С‚СЊ РІР°С€Рё РЅР°СЃС‚СЂРѕР№РєРё СЃРєРѕСЂРѕСЃС‚Рё 400 РєР“С†.
+    // РџСЂРёРјРµСЂ РґР»СЏ APB1 = 36 РњР“С† (Fast Mode, duty cycle 2):
+    I2C1->CR2   = 36;          // Р§Р°СЃС‚РѕС‚Р° APB1 РїРµСЂРёС„РµСЂРёРё
+    I2C1->CCR   = 30;          // 400 РєР“С† (36000000 / (3 * 400000))
+    I2C1->TRISE = 12;          // РњР°РєСЃРёРјР°Р»СЊРЅРѕРµ РІСЂРµРјСЏ РЅР°СЂР°СЃС‚Р°РЅРёСЏ РґР»СЏ Fast Mode
+    I2C1->CR1  |= I2C_CR1_PE;  // Р’РєР»СЋС‡Р°РµРј РїРµСЂРёС„РµСЂРёСЋ РѕР±СЂР°С‚РЅРѕ
 }
 
 uint8_t si5351_write(uint8_t reg, uint8_t value) {
     uint32_t timeout;
 
-    // 1. Ждем, пока шина освободится
+    // 1. Р–РґРµРј, РїРѕРєР° С€РёРЅР° РѕСЃРІРѕР±РѕРґРёС‚СЃСЏ
     timeout = I2C_FAST_TIMEOUT;
     while (I2C1->SR2 & I2C_SR2_BUSY) {
         if (--timeout == 0) {
-            // Сначала выводим сообщение на экран
+            // РЎРЅР°С‡Р°Р»Р° РІС‹РІРѕРґРёРј СЃРѕРѕР±С‰РµРЅРёРµ РЅР° СЌРєСЂР°РЅ
             ILI9341_WriteString(46, 0, "Error SI5351", Font_11x18, GREEN, MYFON);
 			      ILI9341_WriteString(46, 0+18, "I2C Block", Font_11x18, GREEN, MYFON);
             I2C1_ForceReset();
-            return 0; // Теперь выход безопасен
+            return 0; // РўРµРїРµСЂСЊ РІС‹С…РѕРґ Р±РµР·РѕРїР°СЃРµРЅ
         }
     }
 
-    // 2. Генерируем START
+    // 2. Р“РµРЅРµСЂРёСЂСѓРµРј START
     I2C1->CR1 |= I2C_CR1_START;
     timeout = I2C_FAST_TIMEOUT;
     while (!(I2C1->SR1 & I2C_SR1_SB)) {
@@ -426,7 +426,7 @@ uint8_t si5351_write(uint8_t reg, uint8_t value) {
         }
     }
 
-    // 3. Посылаем адрес устройства
+    // 3. РџРѕСЃС‹Р»Р°РµРј Р°РґСЂРµСЃ СѓСЃС‚СЂРѕР№СЃС‚РІР°
     I2C1->DR = (SI5351_ADDRESS << 1); 
     
     timeout = I2C_FAST_TIMEOUT;
@@ -439,7 +439,7 @@ uint8_t si5351_write(uint8_t reg, uint8_t value) {
         }
     }
 
-    // Обработка физического отключения чипа (нет ответа ACK)
+    // РћР±СЂР°Р±РѕС‚РєР° С„РёР·РёС‡РµСЃРєРѕРіРѕ РѕС‚РєР»СЋС‡РµРЅРёСЏ С‡РёРїР° (РЅРµС‚ РѕС‚РІРµС‚Р° ACK)
     if (I2C1->SR1 & I2C_SR1_AF) {
         I2C1->SR1 &= ~I2C_SR1_AF;   
         I2C1->CR1 |= I2C_CR1_STOP;  
@@ -448,9 +448,9 @@ uint8_t si5351_write(uint8_t reg, uint8_t value) {
         return 0;                   
     }
 
-    (void)I2C1->SR2; // Очистка флага ADDR
+    (void)I2C1->SR2; // РћС‡РёСЃС‚РєР° С„Р»Р°РіР° ADDR
 
-    // 4. Посылаем номер регистра
+    // 4. РџРѕСЃС‹Р»Р°РµРј РЅРѕРјРµСЂ СЂРµРіРёСЃС‚СЂР°
     I2C1->DR = reg;
     timeout = I2C_LONG_TIMEOUT;
     while (!(I2C1->SR1 & I2C_SR1_TXE)) {
@@ -463,7 +463,7 @@ uint8_t si5351_write(uint8_t reg, uint8_t value) {
         }
     }
 
-    // 5. Посылаем значение
+    // 5. РџРѕСЃС‹Р»Р°РµРј Р·РЅР°С‡РµРЅРёРµ
     I2C1->DR = value;
     
     timeout = I2C_LONG_TIMEOUT;
@@ -477,10 +477,10 @@ uint8_t si5351_write(uint8_t reg, uint8_t value) {
         }
     }
 
-    // 6. Генерируем STOP
+    // 6. Р“РµРЅРµСЂРёСЂСѓРµРј STOP
     I2C1->CR1 |= I2C_CR1_STOP;
     
-    return 1; // Успешная запись
+    return 1; // РЈСЃРїРµС€РЅР°СЏ Р·Р°РїРёСЃСЊ
 }
 
 // Common code for _SetupPLL and _SetupOutput
