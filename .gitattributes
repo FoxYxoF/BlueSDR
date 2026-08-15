@@ -2,8 +2,8 @@
 * text=auto
 
 # Явно указываем кодировку UTF-8 для исходников Keil
-*.c text working-tree-encoding=utf-8
-*.h text working-tree-encoding=utf-8
+*.c text working-tree-encoding=cp1251 git-encoding=utf-8
+*.h text working-tree-encoding=cp1251 git-encoding=utf-8
 
 # Защита бинарников Keil от порчи при коммите (переносы строк ломают проект)
 *.uvprojx binary
