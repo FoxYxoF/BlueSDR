@@ -16,7 +16,7 @@ BlueSDR — это экспериментальный SDR радиотранси
 
 ## 🧠 Архитектура системы
 
-![DSP Architecture](images/BlueSDR_DSP_Architecture.png)
+![DSP Architecture](images/BlueSDR_DSP_Architecture.JPG)
 
 В основе системы лежит гибридный конвейер ЦОС (DSP):
 
@@ -45,7 +45,7 @@ BlueSDR — это экспериментальный SDR радиотранси
 
 ## 🖥️ Системная интеграция
 
-![System Overview](images/System_Interconnection.png)
+![System Overview](images/System_Interconnection.JPG)
 
 Основные компоненты системы:
 
