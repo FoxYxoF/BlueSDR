@@ -378,7 +378,7 @@ void DMA1_Channel1_IRQHandler(void) {
 		DMA1->IFCR |= DMA_IFCR_CHTIF1;  
 		// -------------------------------
 		// делаем передискритизацию с CIC фильтром
-		Process_IQ_Buffer(&adcData[0], &in_I_ch, &in_Q_ch);
+		Process_IQ_Buffer(&adcData[0], &in_Q_ch, &in_I_ch);
 
 		Fill_buff(); //Заполняем буферы
 	}
@@ -387,7 +387,7 @@ void DMA1_Channel1_IRQHandler(void) {
 		DMA1->IFCR |= DMA_IFCR_CTCIF1;  
 		// -------------------------------
     // делаем передискритизацию с CIC фильтром
-    Process_IQ_Buffer(&adcData[16], &in_I_ch, &in_Q_ch);
+    Process_IQ_Buffer(&adcData[16], &in_Q_ch, &in_I_ch);
 		
 		Fill_buff(); //Заполняем буферы
 	}
@@ -611,10 +611,6 @@ void Fill_buff(void){
 		 in_I_ch = w_I;
      in_Q_ch = w_Q;
 
-//    // ---  ФИЛЬТРАЦИЯ ПЧ 
-//    Filter_Biquad_4th(&in_I_ch, &weaver_lpf_I);
-//    Filter_Biquad_4th(&in_Q_ch, &weaver_lpf_Q);
-	
   // ---------------------------------------------------------
 	// CIC Integrator (Работает ВСЕГДА на частоте АЦП 42682 Гц)
 	// ---------------------------------------------------------
@@ -836,6 +832,7 @@ void Button_Process(uint8_t code) { // Обработчик нажатия кн�
 				Set_mode();         // Установка режима модуляции из trx_state
 				Redraw_mode();      // Перерисовываем модуляцию
 				Redraw_bandwidth(); // Перерисовываем полосу
+				Redraw_ATT();       // Аттеньюатор
 			} 
 			else{
         Menu_Up();   // Меню шаг вверх  
@@ -885,6 +882,7 @@ void Button_Process(uint8_t code) { // Обработчик нажатия кн�
 				Set_mode();           // Установка режима модуляции из trx_state
 				Redraw_mode();        // Перерисовываем модуляцию
 				Redraw_bandwidth();   // Перерисовываем полосу
+				Redraw_ATT();         // Аттеньюатор
 			}
 			else{
         Menu_Down();   // Меню шаг вниз
@@ -906,6 +904,7 @@ void Button_Process(uint8_t code) { // Обработчик нажатия кн�
 			break;
 				
 		case 0x07: // Кнопка 7 (0111) 
+			
 			//Шаг перестройки
 			switch (trx_state.tuning_step)				// Уменьшаем щаг, плашка под символами идет слева на право
 			{
@@ -992,7 +991,14 @@ void Button_LongPress_Process(uint8_t code) { // Обработчик нажат
 			break;
 				
 		case 0x07: // Кнопка 7 (0111)
-			//ILI9341_WriteString(   30, 30, "LongButton 7", Font_11x18, GREEN, MYFON);
+			//Переключаем аттеньюатор
+		  if(trx_state.band_att_pre[trx_state.current_band]==1) {
+				trx_state.band_att_pre[trx_state.current_band]=0;
+			}
+			else{
+				trx_state.band_att_pre[trx_state.current_band]=1;
+			}
+		  Redraw_ATT();         // Перерисовыем и устанавливаем аттеньюатор
 			break;
 				
 		case 0x08: // Кнопка 8 (1000)

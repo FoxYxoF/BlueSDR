@@ -40,6 +40,7 @@ void Redraw_Band(void);        // Перерисовываем диапазон
 void Redraw_mode(void);        // Перерисовываем модуляцию
 void Redraw_volume(void);      // Перерисовываем громкость
 void Redraw_bandwidth(void);   // Перерисовываем полосу
+void Redraw_ATT(void);         // Перерисовываем аттеньюатор
 void Redraw_Main_Scr(void);    // Перерисовываем главный экран
 void Redraw_Step(uint16_t step, uint8_t m_fl); // Перерисовываем шаг для нормального режима и настроек
 

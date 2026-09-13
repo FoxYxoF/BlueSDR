@@ -633,7 +633,7 @@ void DSP_init(void){  // Инициализация функций библио�
 
 void RX_Device_Inint(void){  // Инициализация ЦАП и АЦП на прием
 	  GPIOB->BRR |= GPIO_BSRR_BS10;       //   Убрали бит передачи.
-    GPIOB->BSRR |= GPIO_BSRR_BS11;      //   Установили бит прием.
+    
     // 1. ПОЛНАЯ ОСТАНОВКА
     ADC1->CR2 &= ~(ADC_CR2_SWSTART | ADC_CR2_CONT); // Стоп запуск и цикл
     DMA1_Channel1->CCR &= ~DMA_CCR1_EN;             // Стоп ПДП
@@ -678,7 +678,7 @@ void RX_Device_Inint(void){  // Инициализация ЦАП и АЦП на
 	  TIM4->CR1 |= TIM_CR1_CEN;     // Стартуем преобразование гилберта и фнч
 }
 void TX_Device_Inint(void){  // Инициализация ЦАП и АЦП на передачу
-	  GPIOB->BRR |= GPIO_BSRR_BS11;       //   Убрали бит прием.
+	  
     GPIOB->BSRR |= GPIO_BSRR_BS10;      //   Установили бит передачи.
     // 1. ПОЛНАЯ ОСТАНОВКА
     ADC1->CR2 &= ~(ADC_CR2_SWSTART | ADC_CR2_CONT); // Стоп запуск и цикл
@@ -1117,6 +1117,17 @@ void Redraw_bandwidth(void){  // Перерисовываем полосу
 	}
 }
 
+void Redraw_ATT(void){ // Перерисовываем аттеньюатор
+	ILI9341_WriteString( 146, 180+21, "ATT", Font_11x18, BORDERCL, MYFON);
+	if(trx_state.band_att_pre[trx_state.current_band]==1){ // Если аттньюатор включен
+		ILI9341_WriteString( 146+44, 180+21, " On", Font_11x18, BORDERCL, MYFON);
+		GPIOB->BSRR |= GPIO_BSRR_BS11;      //   Установили бит ATT
+	}
+	else{ // аттньюатор выключен
+		ILI9341_WriteString( 146+44, 180+21, "Off", Font_11x18, BORDERCL, MYFON);
+		GPIOB->BRR |= GPIO_BSRR_BS11;       //   Убрали бит ATT
+	}
+}
 void Redraw_Main_Scr(void){  // Перерисовываем главный экран
 	// Отрисовка основного экрана
 	ILI9341_Draw_Rectangle(46, 0, 243-46, 240, MYFON);
@@ -1132,6 +1143,7 @@ void Redraw_Main_Scr(void){  // Перерисовываем главный эк
 	Redraw_mode();        // Перерисовываем модуляцию
 	Redraw_volume();      // Перерисовываем громкость
 	Redraw_bandwidth();   // Перерисовываем полосу
+	Redraw_ATT();         // Аттеньюатор
 	
 	
 //	 
