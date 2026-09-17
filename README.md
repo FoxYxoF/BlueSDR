@@ -31,8 +31,8 @@ BlueSDR — это экспериментальный SDR радиотранси
 
 ## 📻 ВЧ-тракт (RF Frontend)
 
-![RF Modem](images/RF_Modem_Schematic.JPG)
-![Main Board PCB](images/Main_board.JPG)
+![RF Modem 1](images/RF_Modem_Schematic.JPG)
+![RF Modem 2](images/Main_board.JPG)
 [`Печатная плата в формате .lay6(Sprin-Layout)`](images/Main_board.lay6)
 
 Аналоговая подсистема включает в себя:
