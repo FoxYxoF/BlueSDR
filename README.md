@@ -32,6 +32,8 @@ BlueSDR — это экспериментальный SDR радиотранси
 ## 📻 ВЧ-тракт (RF Frontend)
 
 ![RF Modem](images/RF_Modem_Schematic.JPG)
+![Main Board PCB](images/Main_board.JPG)
+[`Печатная плата в формате .lay6(Sprin-Layout)`](images/Main_board.lay6)
 
 Аналоговая подсистема включает в себя:
 
@@ -63,6 +65,10 @@ BlueSDR — это экспериментальный SDR радиотранси
 
 ![Photo 2](images/photo2.jpg)
 
+![Photo 3](images/photo3.jpg)
+
+![Photo 4](images/photo4.jpg)
+
 ---
 
 ## ⚙️ Прошивка
@@ -71,7 +77,8 @@ BlueSDR — это экспериментальный SDR радиотранси
 
 | Версия | Дата релиза | Ссылка на скачивание | Статус |
 | :--- | :--- | :--- | :--- |
-| **v0.2** | 28.07.2026 | [`BlueSDR_v0.2_28072026.hex`](Firmware/BlueSDR_v0.2_28072026.hex) | **Актуальная** |
+| **v0.3** | 17.09.2026 | [`BlueSDR_v0.3_16092026.hex`](Firmware/BlueSDR_v0.2_28072026.hex) | **Актуальная** |
+| **v0.2** | 28.07.2026 | [`BlueSDR_v0.2_28072026.hex`](Firmware/BlueSDR_v0.2_28072026.hex) | Устаревший прототип |
 | **v0.1** | 04.07.2026 | [`BlueSDR_v0.1_04072026.hex`](Firmware/BlueSDR_v0.1_04072026.hex) | Устаревший прототип |
 
 ### Прошивка микроконтроллера

@@ -158,26 +158,30 @@ void GPIO_Init(void){	// инициализация портов ввода вы
 	GPIOA->CRH &= ~(GPIO_CRH_MODE12 | GPIO_CRH_CNF12); // Полностью очищаем MODE и CNF для PA12
 	GPIOA->CRH |= (GPIO_CRH_MODE12_0 | GPIO_CRH_MODE12_1); // MODE = 11 (Max Speed 50MHz), CNF = 00 (Push-Pull
 
-	// PA2 ДПФ1
-	GPIOA->CRL   &= ~GPIO_CRL_CNF2;     // Сброс CNF (00: General purpose output push-pull)
-	GPIOA->CRL   &= ~GPIO_CRL_MODE2;    // Очистка режима
-	GPIOA->CRL   |=  GPIO_CRL_MODE2_0;   // Установка MODE (01: Output mode, max speed 10 MHz)
-	// PA1 ДПФ2
+//	// PA2 ДПФ1
+//	GPIOA->CRL   &= ~GPIO_CRL_CNF2;     // Сброс CNF (00: General purpose output push-pull)
+//	GPIOA->CRL   &= ~GPIO_CRL_MODE2;    // Очистка режима
+//	GPIOA->CRL   |=  GPIO_CRL_MODE2_0;   // Установка MODE (01: Output mode, max speed 10 MHz)
+	// PA1 ДПФ1 1-2мГц
 	GPIOA->CRL   &= ~GPIO_CRL_CNF1;     // Сброс CNF (00: General purpose output push-pull)
 	GPIOA->CRL   &= ~GPIO_CRL_MODE1;    // Очистка режима
 	GPIOA->CRL   |=  GPIO_CRL_MODE1_0;   // Установка MODE (01: Output mode, max speed 10 MHz)
-	// PA0 ДПФ3
+	// PA0 ДПФ2 2-4мГц
 	GPIOA->CRL   &= ~GPIO_CRL_CNF0;     // Сброс CNF (00: General purpose output push-pull)
 	GPIOA->CRL   &= ~GPIO_CRL_MODE0;    // Очистка режима
 	GPIOA->CRL   |=  GPIO_CRL_MODE0_0;   // Установка MODE (01: Output mode, max speed 10 MHz)
-	// PC15 ДПФ4
+	// PC15 ДПФ3 4-8мГц
 	GPIOC->CRH   &= ~GPIO_CRH_CNF15;    // Сброс CNF (00: General purpose output push-pull)
 	GPIOC->CRH   &= ~GPIO_CRH_MODE15;   // Очистка режима
 	GPIOC->CRH   |=  GPIO_CRH_MODE15_0;  // Установка MODE (01: Output mode, max speed 10 MHz)
-	// PC14 ДПФ5
+	// PC14 ДПФ4 8-16мГц
 	GPIOC->CRH   &= ~GPIO_CRH_CNF14;    // Сброс CNF (00: General purpose output push-pull)
 	GPIOC->CRH   &= ~GPIO_CRH_MODE14;   // Очистка режима
 	GPIOC->CRH   |=  GPIO_CRH_MODE14_0;  // Установка MODE (01: Output mode, max speed 10 MHz)
+	// PC13 ДПФ5 16-30мГц
+	GPIOC->CRH   &= ~GPIO_CRH_CNF13;    // Сброс CNF (00: General purpose output push-pull)
+	GPIOC->CRH   &= ~GPIO_CRH_MODE13;   // Очистка режима
+	GPIOC->CRH   |=  GPIO_CRH_MODE13_0;  // Установка MODE (01: Output mode, max speed 10 MHz)
 	// Исходное состояние: выключаем все выходы (логический 0)
 	GPIOA->BRR  = (GPIO_BSRR_BS0 | GPIO_BSRR_BS1 | GPIO_BSRR_BS2);
 	GPIOC->BRR  = (GPIO_BSRR_BS14 | GPIO_BSRR_BS15);
@@ -949,35 +953,39 @@ void si5351_SetFrec(uint32_t frec){
 					break;
 			}
 	}
-	// Если диапазон не изменился, пропускаем управление GPIO
-	if (new_range != current_range) {   
-			// Поочередно гасим старый и зажигаем новый пин через регистр BSRR.
-			// BRx - сброс (0), BSx - установка (1).
-			switch (new_range) {
-					case 0: // PA2 (До 2 МГц)
-							GPIOA->BSRR = GPIO_BSRR_BS2 | GPIO_BSRR_BR1 | GPIO_BSRR_BR0;
-							GPIOC->BSRR = GPIO_BSRR_BR15 | GPIO_BSRR_BR14;
-							break;
-					case 1: // PA1 (От 2 до 4 МГц)
-							GPIOA->BSRR = GPIO_BSRR_BR2 | GPIO_BSRR_BS1 | GPIO_BSRR_BR0;
-							GPIOC->BSRR = GPIO_BSRR_BR15 | GPIO_BSRR_BR14;
-							break;
-					case 2: // PA0 (От 4 до 8 МГц)
-							GPIOA->BSRR = GPIO_BSRR_BR2 | GPIO_BSRR_BR1 | GPIO_BSRR_BS0;
-							GPIOC->BSRR = GPIO_BSRR_BR15 | GPIO_BSRR_BR14;
-							break;
-					case 3: // PC15 (От 8 до 16 МГц)
-							GPIOA->BSRR = GPIO_BSRR_BR2 | GPIO_BSRR_BR1 | GPIO_BSRR_BR0;
-							GPIOC->BSRR = GPIO_BSRR_BS15 | GPIO_BSRR_BR14;
-							break;
-					case 4: // PC14 (Выше 16 МГц)
-							GPIOA->BSRR = GPIO_BSRR_BR2 | GPIO_BSRR_BR1 | GPIO_BSRR_BR0;
-							GPIOC->BSRR = GPIO_BSRR_BR15 | GPIO_BSRR_BS14;
-							break;
-			}
-			// Запоминаем новый активный диапазон
-			current_range = new_range;
-	} 
+// Если диапазон не изменился, пропускаем управление GPIO
+if (new_range != current_range) {   
+    // Поочередно гасим старые и зажигаем новый пин через регистр BSRR.
+    // BRx - сброс (0), BSx - установка (1).
+    switch (new_range) {
+        case 0: // PA1 (До 2 МГц)
+            GPIOA->BSRR = GPIO_BSRR_BS1 | GPIO_BSRR_BR0;
+            GPIOC->BSRR = GPIO_BSRR_BR15 | GPIO_BSRR_BR14 | GPIO_BSRR_BR13;
+            break;
+            
+        case 1: // PA0 (От 2 до 4 МГц)
+            GPIOA->BSRR = GPIO_BSRR_BR1 | GPIO_BSRR_BS0;
+            GPIOC->BSRR = GPIO_BSRR_BR15 | GPIO_BSRR_BR14 | GPIO_BSRR_BR13;
+            break;
+            
+        case 2: // PC15 (От 4 до 8 МГц)
+            GPIOA->BSRR = GPIO_BSRR_BR1 | GPIO_BSRR_BR0;
+            GPIOC->BSRR = GPIO_BSRR_BS15 | GPIO_BSRR_BR14 | GPIO_BSRR_BR13;
+            break;
+            
+        case 3: // PC14 (От 8 до 16 МГц)
+            GPIOA->BSRR = GPIO_BSRR_BR1 | GPIO_BSRR_BR0;
+            GPIOC->BSRR = GPIO_BSRR_BR15 | GPIO_BSRR_BS14 | GPIO_BSRR_BR13;
+            break;
+            
+        case 4: // PC13 (Выше 16 МГц)
+            GPIOA->BSRR = GPIO_BSRR_BR1 | GPIO_BSRR_BR0;
+            GPIOC->BSRR = GPIO_BSRR_BR15 | GPIO_BSRR_BR14 | GPIO_BSRR_BS13;
+            break;
+    }
+    // Запоминаем новый активный диапазон
+    current_range = new_range;
+}
 	frec = (frec-10671)<<2; // Компенсация смещения на пч 10671гц и умножения на 4 для формирования квадратур
 	// Установка частоты на CLK0
 	// Параметры: частота в Гц, ток драйвера (2MA, 4MA, 6MA, 8MA)

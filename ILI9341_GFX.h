@@ -14,14 +14,14 @@
 
 ////////////////////////////////////// РЅР°СЃС‚СЂРѕР№РєР° РїРёРЅРѕРІ /////////////////////////////////////
 // С‡РёРї СЃРµР»РµРєС‚ CS Р°РєС‚РёРІРЅС‹Р№ СѓСЂРѕРІРµРЅСЊ РЅРёР·РєРёР№
-#define DISP_CS_SELECT      GPIOA->BRR = GPIO_BSRR_BS12  //HAL_GPIO_WritePin(TFT_CS_GPIO_Port, TFT_CS_Pin, GPIO_PIN_RESET)
-#define DISP_CS_UNSELECT    GPIOA->BSRR = GPIO_BSRR_BS12  //HAL_GPIO_WritePin(TFT_CS_GPIO_Port, TFT_CS_Pin, GPIO_PIN_SET)
+#define DISP_CS_SELECT      GPIOA->BRR = GPIO_BSRR_BS12 
+#define DISP_CS_UNSELECT    GPIOA->BSRR = GPIO_BSRR_BS12  
 
-#define DISP_DC_DATA        GPIOA->BSRR = GPIO_BSRR_BS10  //HAL_GPIO_WritePin(TFT_DC_GPIO_Port, TFT_DC_Pin, GPIO_PIN_SET)
-#define DISP_DC_CMD         GPIOA->BRR = GPIO_BSRR_BS10  //HAL_GPIO_WritePin(TFT_DC_GPIO_Port, TFT_DC_Pin, GPIO_PIN_RESET)
+#define DISP_DC_DATA        GPIOA->BSRR = GPIO_BSRR_BS11  
+#define DISP_DC_CMD         GPIOA->BRR = GPIO_BSRR_BS11  
 
-#define DISP_RST_RESET      GPIOA->BRR = GPIO_BSRR_BS11  //HAL_GPIO_WritePin(TFT_RST_GPIO_Port, TFT_RST_Pin, GPIO_PIN_RESET)
-#define DISP_RST_WORK       GPIOA->BSRR = GPIO_BSRR_BS11  //HAL_GPIO_WritePin(TFT_RST_GPIO_Port, TFT_RST_Pin, GPIO_PIN_SET)
+#define DISP_RST_RESET      GPIOA->BRR = GPIO_BSRR_BS10  
+#define DISP_RST_WORK       GPIOA->BSRR = GPIO_BSRR_BS10  
 
 ///////////////// С€РёСЂРёРЅР° РІС‹СЃРѕС‚Р° ///////////////////
 #define ILI9341_SCREEN_WIDTH 	320
